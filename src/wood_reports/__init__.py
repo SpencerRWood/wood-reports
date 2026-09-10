@@ -20,12 +20,14 @@ from wood_reports.pipeline import (
     ReportGenerationPipeline,
 )
 from wood_reports.powerpoint import PowerPointRenderer, PowerPointRenderError
+from wood_reports.run import Comparison, ReportRun, ReportRunError, ReportRunFactory
 
 __all__ = [
     "Appendix",
     "ChartGenerationContext",
     "ChartReference",
     "ChartResolutionError",
+    "Comparison",
     "Finding",
     "LatexRenderError",
     "LatexRenderer",
@@ -37,6 +39,9 @@ __all__ = [
     "ReportCompiler",
     "ReportGenerationPipeline",
     "ReportMetadata",
+    "ReportRun",
+    "ReportRunError",
+    "ReportRunFactory",
     "ReportValidationError",
     "Section",
     "SourceCompilationError",
