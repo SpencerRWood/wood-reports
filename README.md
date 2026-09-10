@@ -14,6 +14,12 @@ analysis, metrics, and chart construction to the consuming project.
 `wood-charts` remains responsible for chart construction and exported chart artifacts;
 Wood Reports owns their placement and report-level publication treatment.
 
+## Analytics integration
+
+See [the production analytics integration guide](docs/production-analytics-integration.md)
+for the recommended optional repository layers and a verified programmatic example that
+resolves logical charts and produces both LaTeX and PowerPoint outputs.
+
 ## Development
 
 ```bash
