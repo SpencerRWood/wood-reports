@@ -25,6 +25,7 @@ _CONTENT_TOP = Inches(1.45)
 _CONTENT_HEIGHT = Inches(5.25)
 _NAVY = RGBColor(23, 43, 77)  # type: ignore[no-untyped-call]
 _GRAY = RGBColor(89, 89, 89)  # type: ignore[no-untyped-call]
+_DEFAULT_TABLE_MAX_ROWS = 8
 
 
 class PowerPointRenderError(ValueError):
@@ -116,7 +117,7 @@ class PowerPointRenderer:
             if isinstance(content, ChartReference):
                 self._add_chart_slide(presentation, report, section, content, element)
             elif isinstance(content, PublicationTable):
-                self._add_table_slide(presentation, report, section, content)
+                self._add_table_slide(presentation, report, section, content, element)
             else:
                 self._add_narrative_slide(presentation, report, section, content.text)
 
@@ -152,6 +153,7 @@ class PowerPointRenderer:
         report: Report,
         section: Section,
         table: PublicationTable,
+        element: str,
     ) -> None:
         slide = presentation.slides.add_slide(presentation.slide_layouts[6])
         self._add_chrome(
@@ -160,18 +162,54 @@ class PowerPointRenderer:
             table.caption or section.title,
             len(presentation.slides),
         )
+        max_rows = self._hint_integer(
+            table.renderer_hints,
+            "powerpoint.max_rows",
+            _DEFAULT_TABLE_MAX_ROWS,
+            element,
+        )
+        if len(table.rows) > max_rows:
+            raise PowerPointRenderError(
+                element,
+                f"has {len(table.rows)} rows; maximum is {max_rows}",
+            )
+        left = self._hint_inches(table.renderer_hints, "powerpoint.left", 0.65, element)
+        top = self._hint_inches(table.renderer_hints, "powerpoint.top", 1.45, element)
+        width = self._hint_inches(table.renderer_hints, "powerpoint.width", 12, element)
+        height = self._hint_inches(
+            table.renderer_hints, "powerpoint.height", 4.5, element
+        )
+        font_size = self._hint_integer(
+            table.renderer_hints, "powerpoint.font_size", 11, element
+        )
+        row_height = self._hint_inches(
+            table.renderer_hints, "powerpoint.row_height", 0.4, element
+        )
         rows = len(table.rows) + 1
         shape = slide.shapes.add_table(
-            rows, len(table.columns), _MARGIN, _CONTENT_TOP, Inches(12), Inches(4.5)
+            rows, len(table.columns), left, top, width, height
         )
         ppt_table = shape.table
         for column_index, column in enumerate(table.columns):
             ppt_table.cell(0, column_index).text = column.label
+            ppt_table.cell(0, column_index).text_frame.paragraphs[0].font.bold = (
+                table.renderer_hints.get("powerpoint.header_emphasis", "bold") == "bold"
+            )
+            column_width = column.renderer_hints.get("powerpoint.width")
+            if column_width is not None:
+                ppt_table.columns[column_index].width = self._inches(
+                    column_width, f"{element}.columns[{column_index}].powerpoint.width"
+                )
         for row_index, row in enumerate(table.rows, start=1):
             for column_index, cell in enumerate(row):
-                ppt_table.cell(row_index, column_index).text = (
-                    "" if cell is None else str(cell)
+                table_cell = ppt_table.cell(row_index, column_index)
+                table_cell.text = "" if cell is None else str(cell)
+                table_cell.text_frame.paragraphs[0].alignment = self._alignment(
+                    table.columns[column_index].alignment
                 )
+                table_cell.text_frame.paragraphs[0].font.size = Pt(font_size)
+        for row in ppt_table.rows:
+            row.height = row_height
         if table.caption:
             self._add_text(
                 slide,
@@ -181,6 +219,17 @@ class PowerPointRenderer:
                 Inches(12),
                 0.35,
                 11,
+                color=_GRAY,
+            )
+        if table.notes:
+            self._add_text(
+                slide,
+                " ".join(table.notes),
+                _MARGIN,
+                Inches(6.55),
+                Inches(12),
+                0.3,
+                9,
                 color=_GRAY,
             )
 
@@ -258,6 +307,52 @@ class PowerPointRenderer:
             color=_GRAY,
             alignment=PP_ALIGN.RIGHT,
         )
+
+    @staticmethod
+    def _alignment(alignment: str) -> PP_ALIGN:
+        return {
+            "left": PP_ALIGN.LEFT,
+            "center": PP_ALIGN.CENTER,
+            "right": PP_ALIGN.RIGHT,
+        }[alignment]
+
+    def _hint_integer(
+        self, hints: dict[str, str], name: str, default: int, element: str
+    ) -> int:
+        value = hints.get(name)
+        if value is None:
+            return default
+        try:
+            result = int(value)
+        except ValueError as error:
+            raise PowerPointRenderError(
+                element, f"{name} must be an integer"
+            ) from error
+        if result <= 0:
+            raise PowerPointRenderError(element, f"{name} must be positive")
+        return result
+
+    def _hint_inches(
+        self, hints: dict[str, str], name: str, default: float, element: str
+    ) -> Any:
+        value = hints.get(name)
+        return (
+            Inches(default)
+            if value is None
+            else self._inches(value, f"{element}.{name}")
+        )
+
+    @staticmethod
+    def _inches(value: str, element: str) -> Any:
+        try:
+            result = float(value)
+        except ValueError as error:
+            raise PowerPointRenderError(
+                element, "must be a number of inches"
+            ) from error
+        if result <= 0:
+            raise PowerPointRenderError(element, "must be positive")
+        return Inches(result)
 
     def _add_text(  # noqa: PLR0913, PLR0917
         self,
