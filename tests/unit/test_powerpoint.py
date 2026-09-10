@@ -2,13 +2,16 @@ import base64
 from pathlib import Path
 from typing import Any
 
+import pytest
 from pptx import Presentation
+from pptx.enum.text import PP_ALIGN
 
 from wood_reports import (
     ChartReference,
     Finding,
     Narrative,
     PowerPointRenderer,
+    PowerPointRenderError,
     PublicationTable,
     Report,
     ReportMetadata,
@@ -114,3 +117,69 @@ def test_full_frame_chart_layout_uses_the_entire_slide_without_report_chrome(
     assert len(presentation.slides) == 3
     assert slide_text(presentation.slides[2]) == ""
     assert len(presentation.slides[2].shapes) == 1
+
+
+def test_table_hints_control_native_layout_without_mutating_source_data(
+    tmp_path: Path,
+) -> None:
+    table = PublicationTable(
+        columns=(
+            TableColumn("name", "Name", renderer_hints={"powerpoint.width": "3"}),
+            TableColumn("value", "Value", alignment="right"),
+        ),
+        rows=(("August", 1200.5),),
+        caption="Monthly revenue",
+        notes=("Unaudited.",),
+        renderer_hints={
+            "powerpoint.left": "1",
+            "powerpoint.top": "2",
+            "powerpoint.width": "10",
+            "powerpoint.height": "3",
+            "powerpoint.font_size": "14",
+            "powerpoint.row_height": "0.5",
+            "powerpoint.max_rows": "2",
+        },
+    )
+    report = Report(
+        metadata=ReportMetadata("Table report"),
+        sections=(Section("Overview", (table,)),),
+    )
+    destination = tmp_path / "table.pptx"
+
+    PowerPointRenderer().render(report, destination, artifact_root=tmp_path)
+    rendered_table = next(
+        shape.table
+        for shape in Presentation(str(destination)).slides[2].shapes
+        if shape.has_table
+    )
+
+    assert rendered_table.cell(1, 0).text == "August"
+    assert rendered_table.cell(1, 1).text == "1200.5"
+    assert (
+        rendered_table.cell(1, 1).text_frame.paragraphs[0].alignment == PP_ALIGN.RIGHT
+    )
+    assert rendered_table.cell(0, 0).text_frame.paragraphs[0].font.bold is True
+    assert table.rows == (("August", 1200.5),)
+
+
+def test_table_row_limit_reports_the_table_location(tmp_path: Path) -> None:
+    report = Report(
+        metadata=ReportMetadata("Table report"),
+        sections=(
+            Section(
+                "Overview",
+                (
+                    PublicationTable(
+                        columns=(TableColumn("name", "Name"),),
+                        rows=(("August",), ("September",)),
+                        renderer_hints={"powerpoint.max_rows": "1"},
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    with pytest.raises(PowerPointRenderError, match=r"sections\[0\]\.content\[0\]"):
+        PowerPointRenderer().render(
+            report, tmp_path / "too-many-rows.pptx", artifact_root=tmp_path
+        )
