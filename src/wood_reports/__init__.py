@@ -18,6 +18,7 @@ from wood_reports.pipeline import (
     ChartResolutionError,
     ReportGenerationPipeline,
 )
+from wood_reports.powerpoint import PowerPointRenderer, PowerPointRenderError
 
 __all__ = [
     "Appendix",
@@ -26,6 +27,8 @@ __all__ = [
     "ChartResolutionError",
     "Finding",
     "Narrative",
+    "PowerPointRenderError",
+    "PowerPointRenderer",
     "PublicationTable",
     "Report",
     "ReportCompiler",
