@@ -108,6 +108,9 @@ class ReportCompiler:
                 author=self._optional_text(
                     metadata.get("author"), source, "metadata.author"
                 ),
+                source=self._optional_text(
+                    metadata.get("source"), source, "metadata.source"
+                ),
                 renderer_hints=self._hints(
                     metadata.get("renderer_hints", {}),
                     source,
@@ -169,12 +172,27 @@ class ReportCompiler:
             return Narrative(self._render_text(payload, source, f"{field}.narrative"))
         payload_data = self._mapping(payload, source, f"{field}.{kind}")
         if kind == "chart":
+            identity = self._optional_text(
+                payload_data.get("identity"), source, f"{field}.chart.identity"
+            )
+            artifact = self._optional_text(
+                payload_data.get("artifact"), source, f"{field}.chart.artifact"
+            )
+            if identity is None and artifact is None:
+                raise SourceCompilationError(
+                    source,
+                    f"{field}.chart",
+                    "must declare an identity or artifact",
+                )
+            if identity is not None and artifact is not None:
+                raise SourceCompilationError(
+                    source,
+                    f"{field}.chart",
+                    "must not declare both identity and artifact",
+                )
             return ChartReference(
-                artifact=Path(
-                    self._text(
-                        payload_data.get("artifact"), source, f"{field}.chart.artifact"
-                    )
-                ),
+                artifact=Path(artifact) if artifact is not None else None,
+                identity=identity,
                 caption=self._optional_rendered_text(
                     payload_data.get("caption"), source, f"{field}.chart.caption"
                 ),

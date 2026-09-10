@@ -41,6 +41,7 @@ class ReportMetadata:
     title: str
     subtitle: str | None = None
     author: str | None = None
+    source: str | None = None
     renderer_hints: RendererHints = field(default_factory=dict)
 
     def validate(self, element: str = "metadata") -> None:
@@ -60,13 +61,20 @@ class Narrative:
 
 @dataclass(frozen=True, slots=True)
 class ChartReference:
-    """A locally rendered chart artifact to place in a report."""
+    """A logical chart or locally produced artifact to place in a report."""
 
-    artifact: Path
+    artifact: Path | None = None
+    identity: str | None = None
     caption: str | None = None
     renderer_hints: RendererHints = field(default_factory=dict)
 
     def validate(self, element: str, artifact_root: Path) -> None:
+        if self.artifact is None and self.identity is None:
+            raise ReportValidationError(
+                element, "must reference a chart identity or local artifact"
+            )
+        if self.artifact is None:
+            return
         artifact = artifact_root / self.artifact
         if not artifact.is_file():
             raise ReportValidationError(
