@@ -1,6 +1,7 @@
 """Reusable publication primitives for analytical reports."""
 
 from wood_reports.compiler import ReportCompiler, SourceCompilationError
+from wood_reports.latex import LatexRenderer, LatexRenderError
 from wood_reports.model import (
     Appendix,
     ChartReference,
@@ -26,6 +27,8 @@ __all__ = [
     "ChartReference",
     "ChartResolutionError",
     "Finding",
+    "LatexRenderError",
+    "LatexRenderer",
     "Narrative",
     "PowerPointRenderError",
     "PowerPointRenderer",
