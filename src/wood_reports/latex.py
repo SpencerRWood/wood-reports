@@ -18,6 +18,7 @@ class LatexRenderer:
             r"\documentclass{article}",
             r"\usepackage{graphicx}",
             r"\usepackage{booktabs}",
+            r"\usepackage{longtable}",
             r"\begin{document}",
             f"\\title{{{report.metadata.title}}}",
             r"\maketitle",
@@ -46,11 +47,17 @@ class LatexRenderer:
                         ]
                     )
                 elif isinstance(item, PublicationTable):
+                    long = item.renderer_hints.get("latex.layout") == "longtable"
+                    if long and item.renderer_hints.get("latex.width"):
+                        raise LatexRenderError("longtable cannot use latex.width")
+                    environment = "longtable" if long else "tabular"
                     parts.extend(
                         [
                             r"\begin{table}[htbp]",
                             r"\centering",
-                            "\\begin{tabular}{"
+                            "\\begin{"
+                            + environment
+                            + "}{"
                             + "".join(
                                 "lcr"[{"left": 0, "center": 1, "right": 2}[c.alignment]]
                                 for c in item.columns
@@ -58,7 +65,7 @@ class LatexRenderer:
                             + "}",
                             r"\toprule",
                             " & ".join(c.label for c in item.columns) + r" \\",
-                            r"\midrule",
+                            r"\midrule" if not long else r"\midrule\endhead",
                         ]
                     )
                     parts.extend(
@@ -68,8 +75,11 @@ class LatexRenderer:
                     parts.extend(
                         [
                             r"\bottomrule",
-                            r"\end{tabular}",
+                            "\\end{" + environment + "}",
                             f"\\caption{{{item.caption}}}" if item.caption else "",
+                            "\\textit{" + " ".join(item.notes) + "}"
+                            if item.notes
+                            else "",
                             r"\end{table}",
                         ]
                     )
