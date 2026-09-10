@@ -2,6 +2,7 @@
 
 from wood_reports.compiler import ReportCompiler, SourceCompilationError
 from wood_reports.latex import LatexRenderer, LatexRenderError
+from wood_reports.latex_workspace import LatexWorkspaceError, LatexWorkspacePublisher
 from wood_reports.manifest import OutputExistsError, RunOutputWriter, TargetStatus
 from wood_reports.model import (
     Appendix,
@@ -32,6 +33,8 @@ __all__ = [
     "Finding",
     "LatexRenderError",
     "LatexRenderer",
+    "LatexWorkspaceError",
+    "LatexWorkspacePublisher",
     "Narrative",
     "OutputExistsError",
     "PowerPointRenderError",
