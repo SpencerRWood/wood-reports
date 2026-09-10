@@ -25,7 +25,11 @@ def test_project_metadata_describes_wood_reports() -> None:
         "Reusable publication layer for PowerPoint and LaTeX analytical reports."
     )
     assert project["requires-python"] == ">=3.14"
-    assert project["dependencies"] == ["jinja2>=3.1", "pyyaml>=6.0"]
+    assert project["dependencies"] == [
+        "jinja2>=3.1",
+        "python-pptx>=1.0",
+        "pyyaml>=6.0",
+    ]
 
 
 def test_project_declares_typed_src_package() -> None:
