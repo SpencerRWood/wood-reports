@@ -2,6 +2,7 @@
 
 from wood_reports.compiler import ReportCompiler, SourceCompilationError
 from wood_reports.latex import LatexRenderer, LatexRenderError
+from wood_reports.manifest import OutputExistsError, RunOutputWriter, TargetStatus
 from wood_reports.model import (
     Appendix,
     ChartReference,
@@ -32,6 +33,7 @@ __all__ = [
     "LatexRenderError",
     "LatexRenderer",
     "Narrative",
+    "OutputExistsError",
     "PowerPointRenderError",
     "PowerPointRenderer",
     "PublicationTable",
@@ -43,7 +45,9 @@ __all__ = [
     "ReportRunError",
     "ReportRunFactory",
     "ReportValidationError",
+    "RunOutputWriter",
     "Section",
     "SourceCompilationError",
     "TableColumn",
+    "TargetStatus",
 ]
