@@ -141,6 +141,40 @@ sections:
     assert error.value.field == "sections[0].content[0].table.columns[0].alignment"
 
 
+def test_chart_accepts_stable_logical_identity(tmp_path: Path) -> None:
+    source = tmp_path / "report.yaml"
+    source.write_text(
+        """metadata: {title: Report, source: Finance ledger}
+sections:
+  - title: Overview
+    content: [{chart: {identity: revenue-trend}}]
+""",
+        encoding="utf-8",
+    )
+
+    report = ReportCompiler().compile_file(source)
+
+    assert report.metadata.source == "Finance ledger"
+    assert report.sections[0].content[0] == ChartReference(identity="revenue-trend")
+
+
+def test_chart_rejects_identity_and_artifact_together(tmp_path: Path) -> None:
+    source = tmp_path / "report.yaml"
+    source.write_text(
+        """metadata: {title: Report}
+sections:
+  - title: Overview
+    content: [{chart: {identity: revenue-trend, artifact: trend.png}}]
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SourceCompilationError) as error:
+        ReportCompiler().compile_file(source)
+
+    assert error.value.field == "sections[0].content[0].chart"
+
+
 def test_missing_markdown_finding_identifies_the_referencing_source(
     tmp_path: Path,
 ) -> None:

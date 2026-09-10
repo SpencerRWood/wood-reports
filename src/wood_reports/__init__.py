@@ -13,15 +13,23 @@ from wood_reports.model import (
     Section,
     TableColumn,
 )
+from wood_reports.pipeline import (
+    ChartGenerationContext,
+    ChartResolutionError,
+    ReportGenerationPipeline,
+)
 
 __all__ = [
     "Appendix",
+    "ChartGenerationContext",
     "ChartReference",
+    "ChartResolutionError",
     "Finding",
     "Narrative",
     "PublicationTable",
     "Report",
     "ReportCompiler",
+    "ReportGenerationPipeline",
     "ReportMetadata",
     "ReportValidationError",
     "Section",
