@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from wood_reports.model import Report
 
@@ -33,10 +33,27 @@ class ReportRun:
     comparisons: Mapping[str, Comparison]
     flags: Mapping[str, bool]
 
+    def materialize(self) -> Report:
+        """Return renderer-ready structure after applying precomputed flag decisions."""
+        included = []
+        for finding in self.definition.findings:
+            if finding.include_if is None:
+                included.append(finding)
+                continue
+            try:
+                include = self.flags[finding.include_if]
+            except KeyError as error:
+                raise ReportRunError(
+                    f"flags.{finding.include_if}",
+                    "is required by a finding include_if condition",
+                ) from error
+            if include:
+                included.append(replace(finding, include_if=None))
+        return replace(self.definition, findings=tuple(included))
 
-class ReportRunFactory:
+    @classmethod
     def create(  # noqa: PLR0913
-        self,
+        cls,
         definition: Report,
         *,
         period: str,
@@ -51,7 +68,7 @@ class ReportRunFactory:
         flags = flags or {}
         if not all(isinstance(flag, bool) for flag in flags.values()):
             raise ReportRunError("flags", "values must be booleans")
-        return ReportRun(
+        return cls(
             definition,
             period,
             comparison_period,

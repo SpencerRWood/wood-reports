@@ -30,6 +30,7 @@ powerpoint = ["python-pptx>=1.0"]
 [dependency-groups]
 dev = [
   "coverage[toml]",
+  "ipykernel>=7.3.0",
   "mypy",
   "pre-commit",
   "pytest",
@@ -38,6 +39,7 @@ dev = [
   "python-semantic-release",
   "ruff",
   "types-pyyaml",
+  "wood-charts",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -138,3 +140,6 @@ token = { env = "GITHUB_TOKEN" }
 
 [tool.semantic_release.publish]
 upload_to_vcs_release = true
+
+[tool.uv.sources]
+wood-charts = { git = "https://github.com/SpencerRWood/wood-charts.git", tag = "v0.2.0" }

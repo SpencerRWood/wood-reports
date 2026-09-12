@@ -183,3 +183,28 @@ def test_table_row_limit_reports_the_table_location(tmp_path: Path) -> None:
         PowerPointRenderer().render(
             report, tmp_path / "too-many-rows.pptx", artifact_root=tmp_path
         )
+
+
+def test_finding_visual_uses_editable_finding_chrome(tmp_path: Path) -> None:
+    chart = tmp_path / "chart.png"
+    write_png(chart)
+    report = Report(
+        ReportMetadata("Report"),
+        (Section("Results", (Narrative("Text"),)),),
+        findings=(
+            Finding(
+                "weekday",
+                "Weekend falls",
+                Narrative("Narrative"),
+                subtitle="Below baseline",
+                source="Synthetic",
+                visual=ChartReference(Path("chart.png")),
+            ),
+        ),
+    )
+    output = tmp_path / "finding.pptx"
+    PowerPointRenderer().render(report, output, artifact_root=tmp_path)
+    text = slide_text(Presentation(str(output)).slides[-1])
+    assert "Weekend falls" in text
+    assert "Below baseline" in text
+    assert "Synthetic" in text

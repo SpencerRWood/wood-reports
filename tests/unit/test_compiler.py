@@ -80,6 +80,32 @@ def test_compiles_yaml_and_markdown_into_the_public_domain_model(
     assert report.appendices[0].title == "Notes"
 
 
+def test_compiles_finding_semantics_and_shared_chart_visual(tmp_path: Path) -> None:
+    chart = tmp_path / "chart.png"
+    chart.touch()
+    (tmp_path / "finding.md").write_text(
+        "---\nidentity: weekday-sessions\ntitle: Weekend traffic falls\n"
+        "subtitle: Below weekday baseline\nsource: Synthetic data\n---\n"
+        "Narrative.",
+        encoding="utf-8",
+    )
+    source = tmp_path / "report.yaml"
+    source.write_text(
+        "metadata: {title: Report}\n"
+        "sections: [{title: Overview, content: [{narrative: Text}]}]\n"
+        "findings: [{source: finding.md, include_if: show, "
+        "visual: {chart: {artifact: chart.png}}}]\n",
+        encoding="utf-8",
+    )
+    finding = ReportCompiler().compile_file(source).findings[0]
+    assert (finding.subtitle, finding.source, finding.include_if) == (
+        "Below weekday baseline",
+        "Synthetic data",
+        "show",
+    )
+    assert isinstance(finding.visual, ChartReference)
+
+
 def test_invalid_yaml_field_identifies_its_source_and_field(tmp_path: Path) -> None:
     source = tmp_path / "report.yaml"
     source.write_text("metadata: []\nsections: []\n", encoding="utf-8")

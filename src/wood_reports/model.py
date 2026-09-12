@@ -75,7 +75,7 @@ class ChartReference:
             )
         if self.artifact is None:
             return
-        artifact = artifact_root / self.artifact
+        artifact = resolve_chart_artifact(self, artifact_root)
         if not artifact.is_file():
             raise ReportValidationError(
                 element,
@@ -139,11 +139,22 @@ class Finding:
     narrative: Narrative
     severity: Literal["info", "warning", "critical"] = "info"
     renderer_hints: RendererHints = field(default_factory=dict)
+    subtitle: str | None = None
+    source: str | None = None
+    visual: ChartReference | PublicationTable | None = None
+    include_if: str | None = None
 
-    def validate(self, element: str) -> None:
+    def validate(self, element: str, artifact_root: Path) -> None:
         _require_text(self.identity, f"{element}.identity")
         _require_text(self.title, f"{element}.title")
         self.narrative.validate(f"{element}.narrative")
+        if self.include_if is not None:
+            _require_text(self.include_if, f"{element}.include_if")
+        if self.visual is not None:
+            if isinstance(self.visual, ChartReference):
+                self.visual.validate(f"{element}.visual", artifact_root)
+            else:
+                self.visual.validate(f"{element}.visual")
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +209,17 @@ class Report:
         for index, section in enumerate(self.sections):
             section.validate(f"sections[{index}]", artifact_root)
         for index, finding in enumerate(self.findings):
-            finding.validate(f"findings[{index}]")
+            finding.validate(f"findings[{index}]", artifact_root)
         for index, appendix in enumerate(self.appendices):
             appendix.validate(f"appendices[{index}]", artifact_root)
+
+
+def resolve_chart_artifact(chart: ChartReference, artifact_root: Path) -> Path:
+    """Return the physical chart file used for both validation and rendering."""
+    if chart.artifact is None:
+        raise ReportValidationError("chart", "requires a resolved local artifact")
+    return (
+        chart.artifact
+        if chart.artifact.is_absolute()
+        else artifact_root / chart.artifact
+    )

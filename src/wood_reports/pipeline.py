@@ -6,7 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from wood_reports.model import Appendix, ChartReference, Report, Section
+from wood_reports.model import Appendix, ChartReference, Finding, Report, Section
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +65,10 @@ class ReportGenerationPipeline:
                 self._resolve_appendix(appendix, f"appendices[{index}]", context)
                 for index, appendix in enumerate(report.appendices)
             ),
+            findings=tuple(
+                self._resolve_finding(finding, f"findings[{index}]", context)
+                for index, finding in enumerate(report.findings)
+            ),
         )
         resolved.validate(artifact_root)
         return resolved
@@ -93,6 +97,16 @@ class ReportGenerationPipeline:
                 else item
                 for index, item in enumerate(appendix.content)
             ),
+        )
+
+    def _resolve_finding(
+        self, finding: Finding, element: str, context: ChartGenerationContext
+    ) -> Finding:
+        return replace(
+            finding,
+            visual=self._resolve_chart(finding.visual, f"{element}.visual", context)
+            if isinstance(finding.visual, ChartReference)
+            else finding.visual,
         )
 
     def _resolve_chart(

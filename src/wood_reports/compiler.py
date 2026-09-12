@@ -279,6 +279,12 @@ class ReportCompiler:
                 "severity",
                 "must be info, warning, or critical",
             )
+        visual: ChartReference | PublicationTable | None = None
+        if "visual" in data:
+            visual_data = self._mapping(data["visual"], source, f"{field}.visual")
+            visual = self._compile_visual(visual_data, source, f"{field}.visual")
+        elif "chart" in data or "table" in data:
+            visual = self._compile_visual(data, source, field)
         return Finding(
             identity=self._text(
                 frontmatter.get("identity"), finding_source, "identity"
@@ -291,7 +297,33 @@ class ReportCompiler:
                 finding_source,
                 "renderer_hints",
             ),
+            subtitle=self._optional_rendered_text(
+                frontmatter.get("subtitle"), finding_source, "subtitle"
+            ),
+            source=self._optional_rendered_text(
+                frontmatter.get("source"), finding_source, "source"
+            ),
+            visual=visual,
+            include_if=self._optional_text(
+                data.get("include_if"), source, f"{field}.include_if"
+            ),
         )
+
+    def _compile_visual(
+        self, data: SourceMapping, source: Path, field: str
+    ) -> ChartReference | PublicationTable:
+        """Compile the same renderer-neutral visual syntax used in section content."""
+        declared = [name for name in ("chart", "table") if name in data]
+        if len(declared) != 1:
+            raise SourceCompilationError(
+                source, field, "must declare exactly one visual type"
+            )
+        item = self._compile_content_item(
+            {declared[0]: data[declared[0]]}, source, field
+        )
+        if isinstance(item, (ChartReference, PublicationTable)):
+            return item
+        raise SourceCompilationError(source, field, "must declare a chart or table")
 
     def _load_markdown(self, source: Path) -> tuple[SourceMapping, str]:
         try:

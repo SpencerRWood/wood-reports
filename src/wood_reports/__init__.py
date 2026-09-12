@@ -3,14 +3,15 @@
 from typing import TYPE_CHECKING, Any
 
 from wood_reports.api import (
+    OutputExistsError,
     ReportGenerationAPI,
     ReportGenerationError,
     ReportGenerationResult,
+    TargetStatus,
 )
 from wood_reports.compiler import ReportCompiler, SourceCompilationError
 from wood_reports.latex import LatexRenderer, LatexRenderError
 from wood_reports.latex_workspace import LatexWorkspaceError, LatexWorkspacePublisher
-from wood_reports.manifest import OutputExistsError, RunOutputWriter, TargetStatus
 from wood_reports.model import (
     Appendix,
     ChartReference,
@@ -28,7 +29,7 @@ from wood_reports.pipeline import (
     ChartResolutionError,
     ReportGenerationPipeline,
 )
-from wood_reports.run import Comparison, ReportRun, ReportRunError, ReportRunFactory
+from wood_reports.run import Comparison, ReportRun, ReportRunError
 
 if TYPE_CHECKING:
     from wood_reports.powerpoint import PowerPointRenderer, PowerPointRenderError
@@ -58,9 +59,7 @@ __all__ = [
     "ReportMetadata",
     "ReportRun",
     "ReportRunError",
-    "ReportRunFactory",
     "ReportValidationError",
-    "RunOutputWriter",
     "Section",
     "SourceCompilationError",
     "TableColumn",

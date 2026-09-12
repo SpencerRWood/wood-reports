@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import shutil
-from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from wood_reports.latex import LatexRenderer
-from wood_reports.model import Appendix, ChartReference, Report, Section
+from wood_reports.model import Report
 
 
 class LatexWorkspaceError(ValueError):
@@ -56,11 +55,10 @@ class LatexWorkspacePublisher:
         with TemporaryDirectory(dir=workspace, prefix=".wood-reports-") as temporary:
             staging = Path(temporary) / self._generated_directory
             staging.mkdir()
-            rendered = self._copy_assets(report, artifact_root, staging)
             self._renderer.render(
-                rendered,
+                report,
                 staging / "report.tex",
-                artifact_root=staging,
+                artifact_root=artifact_root,
             )
             if generated.exists():
                 shutil.rmtree(generated)
@@ -80,44 +78,3 @@ class LatexWorkspacePublisher:
                 "workspace directory names must be single relative paths"
             )
         return name
-
-    @staticmethod
-    def _copy_assets(report: Report, artifact_root: Path, staging: Path) -> Report:
-        """Copy referenced artifacts and point the rendered report at local copies."""
-        counter = 0
-
-        def copy_chart(chart: ChartReference) -> ChartReference:
-            nonlocal counter
-            if chart.artifact is None:
-                return chart
-            source = artifact_root / chart.artifact
-            counter += 1
-            relative = Path("assets") / f"{counter}-{source.name}"
-            destination = staging / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-            return replace(chart, artifact=relative)
-
-        def copy_section(section: Section) -> Section:
-            return replace(
-                section,
-                content=tuple(
-                    copy_chart(item) if isinstance(item, ChartReference) else item
-                    for item in section.content
-                ),
-            )
-
-        def copy_appendix(appendix: Appendix) -> Appendix:
-            return replace(
-                appendix,
-                content=tuple(
-                    copy_chart(item) if isinstance(item, ChartReference) else item
-                    for item in appendix.content
-                ),
-            )
-
-        return replace(
-            report,
-            sections=tuple(copy_section(section) for section in report.sections),
-            appendices=tuple(copy_appendix(appendix) for appendix in report.appendices),
-        )
