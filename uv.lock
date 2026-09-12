@@ -1734,8 +1734,8 @@ wheels = [
 
 [[package]]
 name = "wood-charts"
-version = "0.2.0"
-source = { git = "https://github.com/SpencerRWood/wood-charts.git?tag=v0.2.0#a2a1180a1f4a83475ba262dee992b3bcd17b07e5" }
+version = "0.3.0"
+source = { git = "https://github.com/SpencerRWood/wood-charts.git?tag=v0.3.0#4c19fe1460cd16a8a9c163de78ac94ea32e13f6f" }
 dependencies = [
     { name = "kaleido" },
     { name = "pandas" },
@@ -1792,7 +1792,7 @@ dev = [
     { name = "python-semantic-release" },
     { name = "ruff" },
     { name = "types-pyyaml" },
-    { name = "wood-charts", git = "https://github.com/SpencerRWood/wood-charts.git?tag=v0.2.0" },
+    { name = "wood-charts", git = "https://github.com/SpencerRWood/wood-charts.git?tag=v0.3.0" },
 ]
 
 [[package]]
