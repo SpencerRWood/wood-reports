@@ -1,80 +1,121 @@
-"""Typed programmatic entry point for compiling and rendering reports."""
+"""Typed public entry point for one-off and recurring report generation."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
-from wood_reports.compiler import ReportCompiler, TemplateValues
-from wood_reports.manifest import TargetStatus
 from wood_reports.model import Report
+from wood_reports.run import ReportRun
 
 type RenderTarget = Literal["latex", "powerpoint"]
 
 
 class ReportGenerationError(ValueError):
-    """Raised when a caller requests an unsupported rendering target."""
+    """Raised for invalid generation requests."""
+
+
+class OutputExistsError(FileExistsError):
+    """Raised when generation would replace a caller-owned output."""
+
+
+@dataclass(frozen=True, slots=True)
+class TargetStatus:
+    target: str
+    status: str
+    output: str | None = None
+    error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ReportGenerationResult:
-    """The compiled report and status of each independently requested target."""
-
     report: Report
     targets: tuple[TargetStatus, ...]
     period: str | None = None
+    manifest: Path | None = None
 
 
 class ReportGenerationAPI:
-    """Compile, validate, and render a report through one typed entry point.
+    """Compile/materialize once, then independently render selected targets.
 
-    Renderer modules are imported only for selected targets. This keeps LaTeX-only
-    callers independent from the optional PowerPoint installation, and vice versa.
-    ``period`` is deliberately metadata rather than a renderer concern, so one-off
-    and recurring callers use precisely the same invocation.
+    Schedulers call this same API with ``period`` and ``immutable=True``; they are
+    not a library dependency.  Target failures are represented in the manifest so
+    a successful sibling output remains available.
     """
 
     def generate(  # noqa: PLR0913
         self,
-        source: Path | Report,
+        run: ReportRun,
         destination: Path,
         *,
         artifact_root: Path | None = None,
         targets: Iterable[RenderTarget] = ("latex", "powerpoint"),
-        values: TemplateValues | None = None,
-        period: str | None = None,
+        report_id: str | None = None,
+        definition_revision: str | None = None,
+        input_artifacts: Iterable[Path] = (),
+        replace: bool = False,
+        immutable: bool = False,
     ) -> ReportGenerationResult:
-        """Compile or validate ``source`` and render each selected target."""
-        report, artifacts = self._report_and_artifacts(source, artifact_root, values)
+        if artifact_root is None:
+            raise ReportGenerationError("artifact_root is required")
+        report = run.materialize()
+        report.validate(artifact_root)
+        artifacts = artifact_root
         selected = tuple(dict.fromkeys(targets))
         unknown = set(selected) - {"latex", "powerpoint"}
         if unknown:
             raise ReportGenerationError(
                 f"unsupported render targets: {sorted(unknown)}"
             )
-        destination.mkdir(parents=True, exist_ok=True)
+        output = destination
+        if immutable:
+            output = (
+                output
+                / (report_id or report.metadata.title.replace(" ", "-").lower())
+                / run.period
+            )
+        if (
+            output.exists()
+            and not replace
+            and any(
+                (output / name).exists()
+                for name in ("report.tex", "report.pptx", "manifest.json")
+            )
+        ):
+            raise OutputExistsError(
+                f"output already exists: {output}; pass replace=True to replace it"
+            )
+        output.mkdir(parents=True, exist_ok=True)
         statuses = tuple(
-            self._render(target, report, destination, artifacts) for target in selected
+            self._render(target, report, output, artifacts, replace)
+            for target in selected
         )
-        return ReportGenerationResult(report, statuses, period)
-
-    @staticmethod
-    def _report_and_artifacts(
-        source: Path | Report,
-        artifact_root: Path | None,
-        values: TemplateValues | None,
-    ) -> tuple[Report, Path]:
-        if isinstance(source, Path):
-            artifacts = artifact_root or source.parent
-            return ReportCompiler(values).compile_file(
-                source, artifact_root=artifacts
-            ), artifacts
-        if artifact_root is None:
-            raise ReportGenerationError("artifact_root is required for a Report source")
-        source.validate(artifact_root)
-        return source, artifact_root
+        manifest = output / "manifest.json"
+        payload = {
+            "comparison_period": run.comparison_period,
+            "comparisons": {
+                key: asdict(value) for key, value in sorted(run.comparisons.items())
+            },
+            "definition_revision": definition_revision,
+            "generated_artifacts": [
+                status.output for status in statuses if status.output
+            ],
+            "input_artifacts": [str(path) for path in sorted(input_artifacts)],
+            "overall_status": "success"
+            if all(status.status == "success" for status in statuses)
+            else "partial_failure",
+            "parameters": dict(sorted(run.values.items())),
+            "period": run.period,
+            "report_id": report_id or report.metadata.title,
+            "targets": [asdict(status) for status in statuses],
+        }
+        manifest.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        return ReportGenerationResult(report, statuses, run.period, manifest)
 
     @staticmethod
     def _render(
@@ -82,19 +123,29 @@ class ReportGenerationAPI:
         report: Report,
         destination: Path,
         artifact_root: Path,
+        replace: bool,
     ) -> TargetStatus:
+        output_path = destination / (
+            "report.tex" if target == "latex" else "report.pptx"
+        )
+        if output_path.exists() and not replace:
+            return TargetStatus(
+                target,
+                "failed",
+                error=f"output exists: {output_path}; pass replace=True",
+            )
         try:
             if target == "latex":
                 from wood_reports.latex import LatexRenderer  # noqa: PLC0415
 
                 output = LatexRenderer().render(
-                    report, destination / "report.tex", artifact_root=artifact_root
+                    report, output_path, artifact_root=artifact_root
                 )
             else:
                 from wood_reports.powerpoint import PowerPointRenderer  # noqa: PLC0415
 
                 output = PowerPointRenderer().render(
-                    report, destination / "report.pptx", artifact_root=artifact_root
+                    report, output_path, artifact_root=artifact_root
                 )
         except Exception as error:
             return TargetStatus(target, "failed", error=str(error))

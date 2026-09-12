@@ -1,3 +1,5 @@
+examples/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -43,6 +45,7 @@ pip-wheel-metadata/
 
 # Jupyter
 .ipynb_checkpoints/
+
 
 # OS files
 .DS_Store

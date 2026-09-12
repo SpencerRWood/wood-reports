@@ -16,6 +16,7 @@ from wood_reports.model import (
     PublicationTable,
     Report,
     Section,
+    resolve_chart_artifact,
 )
 
 _SLIDE_WIDTH = Inches(13.333)
@@ -49,9 +50,20 @@ class PowerPointRenderer:
         self._add_title_slide(presentation, report)
         for section_index, section in enumerate(report.sections):
             self._add_section_slide(presentation, report, section, section_index)
-            self._add_section_content(presentation, report, section, section_index)
+            self._add_section_content(
+                presentation, report, section, section_index, artifact_root
+            )
         if report.findings:
             self._add_summary_slide(presentation, report)
+            for finding_index, finding in enumerate(report.findings):
+                if finding.visual is not None:
+                    self._add_finding_visual(
+                        presentation,
+                        report,
+                        finding,
+                        f"findings[{finding_index}].visual",
+                        artifact_root,
+                    )
 
         destination.parent.mkdir(parents=True, exist_ok=True)
         presentation.save(str(destination))
@@ -111,29 +123,33 @@ class PowerPointRenderer:
         report: Report,
         section: Section,
         section_index: int,
+        artifact_root: Path,
     ) -> None:
         for content_index, content in enumerate(section.content):
             element = f"sections[{section_index}].content[{content_index}]"
             if isinstance(content, ChartReference):
-                self._add_chart_slide(presentation, report, section, content, element)
+                self._add_chart_slide(
+                    presentation, report, section, content, element, artifact_root
+                )
             elif isinstance(content, PublicationTable):
                 self._add_table_slide(presentation, report, section, content, element)
             else:
                 self._add_narrative_slide(presentation, report, section, content.text)
 
-    def _add_chart_slide(
+    def _add_chart_slide(  # noqa: PLR0913, PLR0917
         self,
         presentation: Any,
         report: Report,
         section: Section,
         chart: ChartReference,
         element: str,
+        artifact_root: Path,
     ) -> None:
         if chart.artifact is None:
             raise PowerPointRenderError(element, "requires a resolved chart artifact")
         slide = presentation.slides.add_slide(presentation.slide_layouts[6])
         full_frame = chart.renderer_hints.get("powerpoint.layout") == "full-frame-chart"
-        artifact = chart.artifact
+        artifact = resolve_chart_artifact(chart, artifact_root)
         if full_frame:
             slide.shapes.add_picture(str(artifact), 0, 0, _SLIDE_WIDTH, _SLIDE_HEIGHT)
             return
@@ -147,20 +163,24 @@ class PowerPointRenderer:
             str(artifact), _MARGIN, _CONTENT_TOP, Inches(8.15), _CONTENT_HEIGHT
         )
 
-    def _add_table_slide(
+    def _add_table_slide(  # noqa: PLR0913
         self,
         presentation: Any,
         report: Report,
         section: Section,
         table: PublicationTable,
         element: str,
+        *,
+        finding: Finding | None = None,
     ) -> None:
         slide = presentation.slides.add_slide(presentation.slide_layouts[6])
         self._add_chrome(
             slide,
             report,
-            table.caption or section.title,
+            finding.title if finding else table.caption or section.title,
             len(presentation.slides),
+            subtitle=finding.subtitle if finding else None,
+            source=finding.source if finding else None,
         )
         max_rows = self._hint_integer(
             table.renderer_hints,
@@ -203,7 +223,9 @@ class PowerPointRenderer:
         for row_index, row in enumerate(table.rows, start=1):
             for column_index, cell in enumerate(row):
                 table_cell = ppt_table.cell(row_index, column_index)
-                table_cell.text = "" if cell is None else str(cell)
+                table_cell.text = self._format_cell(
+                    cell, table.columns[column_index].format, element
+                )
                 table_cell.text_frame.paragraphs[0].alignment = self._alignment(
                     table.columns[column_index].alignment
                 )
@@ -246,6 +268,59 @@ class PowerPointRenderer:
         for index, finding in enumerate(report.findings):
             self._add_finding(slide, finding, index)
 
+    def _add_finding_visual(
+        self,
+        presentation: Any,
+        report: Report,
+        finding: Finding,
+        element: str,
+        artifact_root: Path,
+    ) -> None:
+        visual = finding.visual
+        if visual is None:
+            raise PowerPointRenderError(element, "requires a finding visual")
+        if isinstance(visual, ChartReference):
+            if visual.artifact is None:
+                raise PowerPointRenderError(
+                    element, "requires a resolved chart artifact"
+                )
+            slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+            if visual.renderer_hints.get("powerpoint.layout") == "full-frame-chart":
+                slide.shapes.add_picture(
+                    str(resolve_chart_artifact(visual, artifact_root)),
+                    0,
+                    0,
+                    _SLIDE_WIDTH,
+                    _SLIDE_HEIGHT,
+                )
+                return
+            self._add_chrome(
+                slide,
+                report,
+                finding.title,
+                len(presentation.slides),
+                subtitle=finding.subtitle,
+                source=finding.source,
+            )
+            # Finding chart references may be absolute or already materialized.
+            slide.shapes.add_picture(
+                str(resolve_chart_artifact(visual, artifact_root)),
+                _MARGIN,
+                _CONTENT_TOP,
+                Inches(8.15),
+                _CONTENT_HEIGHT,
+            )
+        else:
+            # Table semantics and constraints are shared with report-native tables.
+            self._add_table_slide(
+                presentation,
+                report,
+                Section(finding.title, (visual,)),
+                visual,
+                element,
+                finding=finding,
+            )
+
     def _add_finding(self, slide: Any, finding: Finding, index: int) -> None:
         top = _CONTENT_TOP + Inches(index * 1.25)
         self._add_text(slide, finding.title, _MARGIN, top, Inches(12), 0.3, 16)
@@ -259,7 +334,16 @@ class PowerPointRenderer:
             12,
         )
 
-    def _add_chrome(self, slide: Any, report: Report, heading: str, page: int) -> None:
+    def _add_chrome(  # noqa: PLR0913
+        self,
+        slide: Any,
+        report: Report,
+        heading: str,
+        page: int,
+        *,
+        subtitle: str | None = None,
+        source: str | None = None,
+    ) -> None:
         self._add_text(
             slide,
             report.metadata.title,
@@ -271,10 +355,10 @@ class PowerPointRenderer:
             color=_GRAY,
         )
         self._add_text(slide, heading, _MARGIN, Inches(0.75), Inches(10), 0.55, 22)
-        if report.metadata.subtitle:
+        if subtitle or report.metadata.subtitle:
             self._add_text(
                 slide,
-                report.metadata.subtitle,
+                subtitle or report.metadata.subtitle or "",
                 _MARGIN,
                 Inches(1.18),
                 Inches(10),
@@ -282,10 +366,10 @@ class PowerPointRenderer:
                 9,
                 color=_GRAY,
             )
-        if report.metadata.source:
+        if source or report.metadata.source:
             self._add_text(
                 slide,
-                report.metadata.source,
+                source or report.metadata.source or "",
                 _MARGIN,
                 Inches(7.1),
                 Inches(8),
@@ -294,6 +378,17 @@ class PowerPointRenderer:
                 color=_GRAY,
             )
         self._add_page_number(slide, page)
+
+    @staticmethod
+    def _format_cell(cell: object, format_spec: str | None, element: str) -> str:
+        if cell is None:
+            return ""
+        try:
+            return format(cell, format_spec or "")
+        except (TypeError, ValueError) as error:
+            raise PowerPointRenderError(
+                element, f"invalid table format {format_spec!r}: {error}"
+            ) from error
 
     def _add_page_number(self, slide: Any, page: int) -> None:
         self._add_text(
