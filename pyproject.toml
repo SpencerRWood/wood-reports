@@ -142,4 +142,4 @@ token = { env = "GITHUB_TOKEN" }
 upload_to_vcs_release = true
 
 [tool.uv.sources]
-wood-charts = { path = "../wood-charts", editable = true }
+wood-charts = { git = "https://github.com/SpencerRWood/wood-charts.git", tag = "v0.2.0" }

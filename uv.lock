@@ -1734,35 +1734,13 @@ wheels = [
 
 [[package]]
 name = "wood-charts"
-version = "0.1.0"
-source = { editable = "../wood-charts" }
+version = "0.2.0"
+source = { git = "https://github.com/SpencerRWood/wood-charts.git?tag=v0.2.0#a2a1180a1f4a83475ba262dee992b3bcd17b07e5" }
 dependencies = [
     { name = "kaleido" },
     { name = "pandas" },
     { name = "plotly" },
     { name = "pyyaml" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "kaleido" },
-    { name = "pandas" },
-    { name = "plotly" },
-    { name = "pyyaml" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "coverage", extras = ["toml"] },
-    { name = "gitpython", specifier = ">=3.1.61" },
-    { name = "jupyter" },
-    { name = "matplotlib", specifier = ">=3.11.1" },
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "python-semantic-release" },
-    { name = "ruff" },
 ]
 
 [[package]]
@@ -1814,7 +1792,7 @@ dev = [
     { name = "python-semantic-release" },
     { name = "ruff" },
     { name = "types-pyyaml" },
-    { name = "wood-charts", editable = "../wood-charts" },
+    { name = "wood-charts", git = "https://github.com/SpencerRWood/wood-charts.git?tag=v0.2.0" },
 ]
 
 [[package]]
