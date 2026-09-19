@@ -64,6 +64,7 @@ skip_covered = true
 [tool.ruff]
 line-length = 88
 src = ["src", "tests"]
+extend-exclude = [".workflow-contract"]
 
 [tool.ruff.lint]
 select = [
