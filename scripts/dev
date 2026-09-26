@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if (( $# == 0 )); then
+  echo "Usage: ./scripts/dev <command> [args...]" >&2
+  exit 2
+fi
+
+export SSL_CERT_FILE="${SSL_CERT_FILE:-/etc/ssl/cert.pem}"
+exec infisical run \
+  --domain=https://dev-infisical.woodhost.cloud/api \
+  --projectId=7ea10433-2eeb-4c57-95a9-b793dd40c7a4 \
+  --env=dev \
+  --path=/openproject \
+  -- "$@"

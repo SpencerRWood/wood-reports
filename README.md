@@ -37,9 +37,17 @@ in `tests/`.
 
 ## OpenProject setup
 
-Copy `.env.example` to an untracked `.env`, set the project identifier and root work
-package ID after OpenProject creation, then generate `.env.resolved` with Wood Secrets.
-The global `wood-next-story` helper uses that resolved environment from this repository.
+The checked-in `.wood/config/config.json` contains the nonsecret project settings
+and an `env://OPENPROJECT_API_TOKEN` reference. Sign in with your Infisical user
+account and use the installed `wood-project` CLI through the repository launcher:
+
+```sh
+infisical login --domain=https://dev-infisical.woodhost.cloud/api --method=user --interactive
+./scripts/dev wood-project story next 358 --json
+```
+
+The launcher reads the shared OpenProject token from `Infrastructure Dev/dev:/openproject`.
+Local development does not require a plaintext `.env` or `.env.resolved` file.
 
 ## Status
 
