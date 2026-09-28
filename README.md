@@ -52,4 +52,4 @@ Local development does not require a plaintext `.env` or `.env.resolved` file.
 ## Status
 
 The project is initialized from the Python library template. Product scope and the initial
-V0.1 story backlog are maintained in the Wood Reports Google Drive project folder.
+R1 story backlog are maintained in the Wood Reports Google Drive project folder.
