@@ -95,6 +95,11 @@ class ReportGenerationAPI:
         )
         manifest = output / "manifest.json"
         payload = {
+            "theme": {
+                "identity": report.theme.identity,
+                "revision": report.theme.revision,
+                "brand_revision": report.theme.brand_revision,
+            },
             "comparison_period": run.comparison_period,
             "comparisons": {
                 key: asdict(value) for key, value in sorted(run.comparisons.items())

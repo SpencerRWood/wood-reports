@@ -13,19 +13,15 @@ from pptx.util import Inches, Pt
 from wood_reports.model import (
     ChartReference,
     Finding,
+    Narrative,
     PublicationTable,
     Report,
     Section,
     resolve_chart_artifact,
 )
+from wood_reports.primitives import list_entries, text_runs
+from wood_reports.theme import PublicationTheme
 
-_SLIDE_WIDTH = Inches(13.333)
-_SLIDE_HEIGHT = Inches(7.5)
-_MARGIN = Inches(0.65)
-_CONTENT_TOP = Inches(1.45)
-_CONTENT_HEIGHT = Inches(5.25)
-_NAVY = RGBColor(23, 43, 77)  # type: ignore[no-untyped-call]
-_GRAY = RGBColor(89, 89, 89)  # type: ignore[no-untyped-call]
 _DEFAULT_TABLE_MAX_ROWS = 8
 
 
@@ -41,11 +37,37 @@ class PowerPointRenderer:
     """Render a report independently once its logical charts are resolved."""
 
     def render(self, report: Report, destination: Path, *, artifact_root: Path) -> Path:
+        return _PowerPointDocument(report.theme).render(
+            report, destination, artifact_root=artifact_root
+        )
+
+
+class _PowerPointDocument:
+    def __init__(self, theme: PublicationTheme) -> None:
+        self.theme = theme
+        self._slide_width = Inches(theme.geometry.slide_width)
+        self._slide_height = Inches(theme.geometry.slide_height)
+        self._margin = Inches(theme.geometry.slide_margin)
+        self._content_top = Inches(theme.geometry.content_top)
+        self._content_height = Inches(theme.geometry.content_height)
+        self._primary = self._color(theme.colors.primary)
+        self._muted = self._color(theme.colors.text_muted)
+        self._content_width = self._slide_width - 2 * self._margin
+
+    @staticmethod
+    def _color(value: str) -> Any:
+        return RGBColor.from_string(value.removeprefix("#"))  # type: ignore[no-untyped-call]
+
+    def render(self, report: Report, destination: Path, *, artifact_root: Path) -> Path:
         """Write a valid PowerPoint file and return its destination."""
         report.validate(artifact_root)
         presentation = Presentation()
-        presentation.slide_width = _SLIDE_WIDTH
-        presentation.slide_height = _SLIDE_HEIGHT
+        presentation.slide_width = self._slide_width
+        presentation.slide_height = self._slide_height
+        presentation.core_properties.subject = (
+            f"{self.theme.identity}@{self.theme.revision}; "
+            f"brand@{self.theme.brand_revision}"
+        )
 
         self._add_title_slide(presentation, report)
         for section_index, section in enumerate(report.sections):
@@ -65,6 +87,10 @@ class PowerPointRenderer:
                         artifact_root,
                     )
 
+        for appendix in report.appendices:
+            section = Section(appendix.title, appendix.content, appendix.renderer_hints)
+            self._add_section_slide(presentation, report, section, 0)
+            self._add_section_content(presentation, report, section, 0, artifact_root)
         destination.parent.mkdir(parents=True, exist_ok=True)
         presentation.save(str(destination))
         return destination
@@ -72,29 +98,36 @@ class PowerPointRenderer:
     def _add_title_slide(self, presentation: Any, report: Report) -> None:
         slide = presentation.slides.add_slide(presentation.slide_layouts[6])
         self._add_text(
-            slide, report.metadata.title, _MARGIN, Inches(2.1), Inches(12), 1, 32
+            slide,
+            report.metadata.title,
+            self._margin,
+            Inches(2.1),
+            self._content_width,
+            Inches(1),
+            self.theme.typography.title,
         )
         if report.metadata.subtitle:
             self._add_text(
                 slide,
                 report.metadata.subtitle,
-                _MARGIN,
+                self._margin,
                 Inches(3.25),
-                Inches(12),
-                0.55,
+                self._content_width,
+                Inches(0.55),
                 18,
             )
         if report.metadata.source:
             self._add_text(
                 slide,
                 report.metadata.source,
-                _MARGIN,
+                self._margin,
                 Inches(6.65),
-                Inches(12),
-                0.3,
+                self._content_width,
+                Inches(0.3),
                 10,
-                color=_GRAY,
+                color=self._muted,
             )
+        self._add_brand_footer(slide, report, len(presentation.slides))
 
     def _add_section_slide(
         self,
@@ -107,15 +140,23 @@ class PowerPointRenderer:
         self._add_text(
             slide,
             report.metadata.title,
-            _MARGIN,
+            self._margin,
             Inches(0.55),
             Inches(10),
-            0.3,
+            Inches(0.3),
             10,
-            color=_GRAY,
+            color=self._muted,
         )
-        self._add_text(slide, section.title, _MARGIN, Inches(3.05), Inches(12), 0.8, 28)
-        self._add_page_number(slide, len(presentation.slides))
+        self._add_text(
+            slide,
+            section.title,
+            self._margin,
+            Inches(3.05),
+            self._content_width,
+            Inches(0.8),
+            28,
+        )
+        self._add_brand_footer(slide, report, len(presentation.slides))
 
     def _add_section_content(
         self,
@@ -134,7 +175,7 @@ class PowerPointRenderer:
             elif isinstance(content, PublicationTable):
                 self._add_table_slide(presentation, report, section, content, element)
             else:
-                self._add_narrative_slide(presentation, report, section, content.text)
+                self._add_narrative_slide(presentation, report, section, content)
 
     def _add_chart_slide(  # noqa: PLR0913, PLR0917
         self,
@@ -151,7 +192,9 @@ class PowerPointRenderer:
         full_frame = chart.renderer_hints.get("powerpoint.layout") == "full-frame-chart"
         artifact = resolve_chart_artifact(chart, artifact_root)
         if full_frame:
-            slide.shapes.add_picture(str(artifact), 0, 0, _SLIDE_WIDTH, _SLIDE_HEIGHT)
+            slide.shapes.add_picture(
+                str(artifact), 0, 0, self._slide_width, self._slide_height
+            )
             return
         self._add_chrome(
             slide,
@@ -160,8 +203,23 @@ class PowerPointRenderer:
             len(presentation.slides),
         )
         slide.shapes.add_picture(
-            str(artifact), _MARGIN, _CONTENT_TOP, Inches(8.15), _CONTENT_HEIGHT
+            str(artifact),
+            self._margin,
+            self._content_top,
+            Inches(8.15),
+            self._content_height,
         )
+        if chart.caption:
+            self._add_text(
+                slide,
+                chart.caption,
+                self._margin,
+                Inches(6.75),
+                self._content_width,
+                Inches(0.3),
+                self.theme.typography.caption,
+                color=self._muted,
+            )
 
     def _add_table_slide(  # noqa: PLR0913
         self,
@@ -193,17 +251,38 @@ class PowerPointRenderer:
                 element,
                 f"has {len(table.rows)} rows; maximum is {max_rows}",
             )
-        left = self._hint_inches(table.renderer_hints, "powerpoint.left", 0.65, element)
-        top = self._hint_inches(table.renderer_hints, "powerpoint.top", 1.45, element)
-        width = self._hint_inches(table.renderer_hints, "powerpoint.width", 12, element)
+        left = self._hint_inches(
+            table.renderer_hints,
+            "powerpoint.left",
+            self.theme.geometry.slide_margin,
+            element,
+        )
+        top = self._hint_inches(
+            table.renderer_hints,
+            "powerpoint.top",
+            self.theme.geometry.content_top,
+            element,
+        )
+        width = self._hint_inches(
+            table.renderer_hints,
+            "powerpoint.width",
+            self.theme.geometry.slide_width - 2 * self.theme.geometry.slide_margin,
+            element,
+        )
         height = self._hint_inches(
             table.renderer_hints, "powerpoint.height", 4.5, element
         )
         font_size = self._hint_integer(
-            table.renderer_hints, "powerpoint.font_size", 11, element
+            table.renderer_hints,
+            "powerpoint.font_size",
+            self.theme.typography.table,
+            element,
         )
         row_height = self._hint_inches(
-            table.renderer_hints, "powerpoint.row_height", 0.4, element
+            table.renderer_hints,
+            "powerpoint.row_height",
+            self.theme.spacing.table_row_inches,
+            element,
         )
         rows = len(table.rows) + 1
         shape = slide.shapes.add_table(
@@ -232,35 +311,97 @@ class PowerPointRenderer:
                 table_cell.text_frame.paragraphs[0].font.size = Pt(font_size)
         for row in ppt_table.rows:
             row.height = row_height
+        for row_index, row in enumerate(ppt_table.rows):
+            for cell in row.cells:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = self._color(
+                    self.theme.colors.primary
+                    if row_index == 0
+                    else self.theme.colors.background
+                )
+                for paragraph in cell.text_frame.paragraphs:
+                    paragraph.font.name = self.theme.typography.family
+                    paragraph.font.size = Pt(font_size)
+                    paragraph.font.color.rgb = self._color(
+                        self.theme.colors.background
+                        if row_index == 0
+                        else self.theme.colors.text_primary
+                    )
         if table.caption:
             self._add_text(
                 slide,
                 table.caption,
-                _MARGIN,
+                self._margin,
                 Inches(6.15),
                 Inches(12),
-                0.35,
-                11,
-                color=_GRAY,
+                Inches(0.35),
+                self.theme.typography.caption,
+                color=self._muted,
             )
         if table.notes:
             self._add_text(
                 slide,
                 " ".join(table.notes),
-                _MARGIN,
+                self._margin,
                 Inches(6.55),
                 Inches(12),
-                0.3,
-                9,
-                color=_GRAY,
+                Inches(0.3),
+                self.theme.typography.note,
+                color=self._muted,
             )
 
     def _add_narrative_slide(
-        self, presentation: Any, report: Report, section: Section, text: str
+        self, presentation: Any, report: Report, section: Section, narrative: Narrative
     ) -> None:
         slide = presentation.slides.add_slide(presentation.slide_layouts[6])
         self._add_chrome(slide, report, section.title, len(presentation.slides))
-        self._add_text(slide, text, _MARGIN, _CONTENT_TOP, Inches(12), Inches(4.8), 18)
+        style = self.theme.primitive(narrative.kind, narrative.semantic)
+        text = narrative.text
+        if style.label:
+            self._add_text(
+                slide,
+                style.label,
+                self._margin,
+                self._content_top,
+                self._content_width,
+                Inches(0.4),
+                self.theme.typography.heading,
+                color=self._color(style.color),
+                bold=True,
+            )
+        shape = self._add_text(
+            slide,
+            text,
+            self._margin,
+            self._content_top + (Inches(0.55) if style.label else 0),
+            self._content_width,
+            Inches(4.6),
+            self.theme.typography.heading
+            if narrative.kind == "heading"
+            else self.theme.typography.body,
+            color=self._color(style.color),
+            bold=style.bold and narrative.kind == "heading",
+            markdown=narrative.kind != "code",
+            font=self.theme.typography.code_family
+            if narrative.kind == "code"
+            else None,
+        )
+        if narrative.kind == "callout":
+            shape.line.color.rgb = self._color(style.color)
+            shape.line.width = Pt(2)
+        if narrative.kind == "list":
+            frame = shape.text_frame
+            frame.clear()
+            for index, entry in enumerate(list_entries(text)):
+                paragraph = frame.paragraphs[0] if index == 0 else frame.add_paragraph()
+                paragraph.level = min(entry.level, 8)
+                self._paragraph(
+                    paragraph,
+                    f"{entry.marker} {entry.text}".strip(),
+                    self.theme.typography.body,
+                    self._color(style.color),
+                    markdown=True,
+                )
 
     def _add_summary_slide(self, presentation: Any, report: Report) -> None:
         slide = presentation.slides.add_slide(presentation.slide_layouts[6])
@@ -290,8 +431,8 @@ class PowerPointRenderer:
                     str(resolve_chart_artifact(visual, artifact_root)),
                     0,
                     0,
-                    _SLIDE_WIDTH,
-                    _SLIDE_HEIGHT,
+                    self._slide_width,
+                    self._slide_height,
                 )
                 return
             self._add_chrome(
@@ -305,10 +446,10 @@ class PowerPointRenderer:
             # Finding chart references may be absolute or already materialized.
             slide.shapes.add_picture(
                 str(resolve_chart_artifact(visual, artifact_root)),
-                _MARGIN,
-                _CONTENT_TOP,
+                self._margin,
+                self._content_top,
                 Inches(8.15),
-                _CONTENT_HEIGHT,
+                self._content_height,
             )
         else:
             # Table semantics and constraints are shared with report-native tables.
@@ -322,16 +463,27 @@ class PowerPointRenderer:
             )
 
     def _add_finding(self, slide: Any, finding: Finding, index: int) -> None:
-        top = _CONTENT_TOP + Inches(index * 1.25)
-        self._add_text(slide, finding.title, _MARGIN, top, Inches(12), 0.3, 16)
+        top = self._content_top + Inches(index * 1.25)
+        self._add_text(
+            slide,
+            finding.title,
+            self._margin,
+            top,
+            self._content_width,
+            Inches(0.3),
+            16,
+            color=self._color(self.theme.finding_color(finding.severity)),
+            bold=True,
+        )
         self._add_text(
             slide,
             finding.narrative.text,
-            _MARGIN,
+            self._margin,
             top + Inches(0.35),
             Inches(12),
-            0.65,
+            Inches(0.65),
             12,
+            markdown=True,
         )
 
     def _add_chrome(  # noqa: PLR0913
@@ -347,37 +499,73 @@ class PowerPointRenderer:
         self._add_text(
             slide,
             report.metadata.title,
-            _MARGIN,
+            self._margin,
             Inches(0.35),
             Inches(10),
-            0.3,
+            Inches(0.3),
             10,
-            color=_GRAY,
+            color=self._muted,
         )
-        self._add_text(slide, heading, _MARGIN, Inches(0.75), Inches(10), 0.55, 22)
+        self._add_text(
+            slide,
+            heading,
+            self._margin,
+            Inches(0.75),
+            Inches(10),
+            Inches(0.55),
+            self.theme.typography.heading,
+        )
         if subtitle or report.metadata.subtitle:
             self._add_text(
                 slide,
                 subtitle or report.metadata.subtitle or "",
-                _MARGIN,
+                self._margin,
                 Inches(1.18),
                 Inches(10),
-                0.25,
+                Inches(0.25),
                 9,
-                color=_GRAY,
+                color=self._muted,
             )
         if source or report.metadata.source:
             self._add_text(
                 slide,
                 source or report.metadata.source or "",
-                _MARGIN,
+                self._margin,
                 Inches(7.1),
                 Inches(8),
-                0.2,
+                Inches(0.2),
                 8,
-                color=_GRAY,
+                color=self._muted,
             )
-        self._add_page_number(slide, page)
+        self._add_brand_footer(slide, report, page)
+
+    def _add_brand_footer(self, slide: Any, report: Report, page: int) -> None:
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = self._color(self.theme.colors.background)
+        self._add_text(
+            slide,
+            self.theme.wordmark,
+            self._slide_width - Inches(2.8),
+            Inches(0.35),
+            Inches(2.2),
+            Inches(0.3),
+            11,
+            bold=True,
+        )
+        if report.metadata.confidentiality:
+            self._add_text(
+                slide,
+                report.metadata.confidentiality,
+                self._slide_width - Inches(4.8),
+                self._slide_height - Inches(0.5),
+                Inches(3.4),
+                Inches(0.25),
+                self.theme.typography.note,
+                color=self._muted,
+                alignment=PP_ALIGN.RIGHT,
+            )
+        if self.theme.page_numbers:
+            self._add_page_number(slide, page)
 
     @staticmethod
     def _format_cell(cell: object, format_spec: str | None, element: str) -> str:
@@ -394,12 +582,12 @@ class PowerPointRenderer:
         self._add_text(
             slide,
             str(page),
-            Inches(12.1),
-            Inches(7.0),
+            self._slide_width - Inches(1.2),
+            self._slide_height - Inches(0.5),
             Inches(0.5),
-            0.2,
+            Inches(0.2),
             8,
-            color=_GRAY,
+            color=self._muted,
             alignment=PP_ALIGN.RIGHT,
         )
 
@@ -459,14 +647,53 @@ class PowerPointRenderer:
         height: Any,
         size: Any,
         *,
-        color: Any = _NAVY,
+        color: Any = None,
         alignment: PP_ALIGN = PP_ALIGN.LEFT,
-    ) -> None:
+        bold: bool = False,
+        markdown: bool = False,
+        font: str | None = None,
+    ) -> Any:
         shape = slide.shapes.add_textbox(left, top, width, height)
         frame = shape.text_frame
         frame.clear()
         paragraph = frame.paragraphs[0]
-        paragraph.text = text
         paragraph.alignment = alignment
+        self._paragraph(
+            paragraph,
+            text,
+            size,
+            color or self._primary,
+            bold=bold,
+            markdown=markdown,
+            font=font,
+        )
+        return shape
+
+    def _paragraph(  # noqa: PLR0913
+        self,
+        paragraph: Any,
+        text: str,
+        size: Any,
+        color: Any,
+        *,
+        bold: bool = False,
+        markdown: bool = False,
+        font: str | None = None,
+    ) -> None:
+        paragraph.font.name = font or self.theme.typography.family
         paragraph.font.size = Pt(size)
         paragraph.font.color.rgb = color
+        paragraph.font.bold = bold
+        paragraph.space_after = Pt(self.theme.spacing.paragraph_points)
+        if markdown:
+            for item in text_runs(text):
+                run = paragraph.add_run()
+                run.text = item.text
+                run.font.bold = bold or item.bold
+                run.font.italic = item.italic
+                if item.code:
+                    run.font.name = self.theme.typography.code_family
+                if item.hyperlink:
+                    run.hyperlink.address = item.hyperlink
+        else:
+            paragraph.text = text
