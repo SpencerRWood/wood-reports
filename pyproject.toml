@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
   "jinja2>=3.1",
+  "markdown-it-py>=4.0,<5",
   "pyyaml>=6.0",
 ]
 
@@ -44,6 +45,10 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/wood_reports"]
+
+[tool.wood.openproject]
+project_id = 4
+initiative_id = 426
 
 [tool.pytest.ini_options]
 addopts = [
