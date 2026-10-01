@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import replace
 from pathlib import Path
@@ -31,7 +32,8 @@ def materialize_chart_assets(
         nonlocal ordinal
         source = resolve_chart_artifact(value, artifact_root)
         ordinal += 1
-        name = f"{ordinal}-{source.name}"
+        # TeX paths must not carry braces, control sequences, or machine-local names.
+        name = f"{ordinal}-" + re.sub(r"[^A-Za-z0-9._-]", "_", source.name)
         target = assets / name
         shutil.copy2(source, target)
         return replace(value, artifact=Path("assets") / name)
