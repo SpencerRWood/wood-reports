@@ -45,11 +45,21 @@ from wood_reports.sources import (
     GoogleDriveReader,
     compile_drive_report,
 )
+from wood_reports.theme import (
+    WOOD_ANALYTICS_THEME,
+    PrimitiveStyle,
+    PublicationColors,
+    PublicationGeometry,
+    PublicationSpacing,
+    PublicationTheme,
+    PublicationTypography,
+)
 
 if TYPE_CHECKING:
     from wood_reports.powerpoint import PowerPointRenderer, PowerPointRenderError
 
 __all__ = [
+    "WOOD_ANALYTICS_THEME",
     "Appendix",
     "ChartGenerationContext",
     "ChartReference",
@@ -69,9 +79,15 @@ __all__ = [
     "OutputExistsError",
     "PowerPointRenderError",
     "PowerPointRenderer",
+    "PrimitiveStyle",
     "ProfileSection",
     "ProfileValidationError",
+    "PublicationColors",
+    "PublicationGeometry",
+    "PublicationSpacing",
     "PublicationTable",
+    "PublicationTheme",
+    "PublicationTypography",
     "Report",
     "ReportCompiler",
     "ReportGenerationAPI",

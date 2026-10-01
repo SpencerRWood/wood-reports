@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from wood_reports.theme import WOOD_ANALYTICS_THEME, PublicationTheme
+
 type Alignment = Literal["left", "center", "right"]
 type RendererHints = dict[str, str]
 type TableCell = str | int | float | bool | None
@@ -215,10 +217,12 @@ class Report:
     findings: tuple[Finding, ...] = ()
     appendices: tuple[Appendix, ...] = ()
     renderer_hints: RendererHints = field(default_factory=dict)
+    theme: PublicationTheme = WOOD_ANALYTICS_THEME
 
     def validate(self, artifact_root: Path) -> None:
         """Reject incomplete report structure or missing local artifacts."""
         self.metadata.validate()
+        self.theme.validate()
         if not self.sections:
             raise ReportValidationError("sections", "must contain a section")
         for index, section in enumerate(self.sections):

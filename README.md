@@ -61,3 +61,9 @@ Local development does not require a plaintext `.env` or `.env.resolved` file.
 
 The R2 client publication backlog is maintained in OpenProject and the existing
 implementation workbook in the Wood Reports Google Drive project folder.
+
+## Publication design system
+
+Both renderers use the versioned [Wood Analytics publication theme](docs/publication-design-system.md)
+with shared Markdown primitives and tokens aligned with wood-charts. Generated
+manifests record the theme and brand revisions.

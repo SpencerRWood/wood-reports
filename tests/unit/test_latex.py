@@ -114,7 +114,7 @@ def test_finding_figure_keeps_semantic_chrome_and_local_asset(tmp_path: Path) ->
     text = output.read_text()
     assert "Weekend falls" in text
     assert "Below baseline" in text
-    assert "Source: Synthetic" in text
+    assert r"\WoodSource{Synthetic}" in text
     assert "\\label{fig:weekday-sessions}" in text
     assert "assets/1-chart.png" in text
     assert (output.parent / "assets" / "1-chart.png").is_file()
