@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -61,7 +62,32 @@ class ReportCompiler:
         *,
         artifact_root: Path | None = None,
     ) -> Report:
-        """Compile one YAML report definition and validate its referenced artifacts."""
+        """Compile primary Markdown input, or explicitly identified legacy YAML."""
+        if source.suffix.lower() in {".md", ".markdown"}:
+            from wood_reports.markdown import MarkdownReportCompiler  # noqa: PLC0415
+
+            return MarkdownReportCompiler(self._values).compile_file(
+                source, artifact_root=artifact_root
+            )
+        if source.suffix.lower() not in {".yaml", ".yml"}:
+            raise SourceCompilationError(
+                source, "source", "expected Markdown (.md) or legacy YAML (.yaml)"
+            )
+        warnings.warn(
+            "YAML report composition is legacy; "
+            "author new reports as profile-compliant report.md",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.compile_yaml_file(source, artifact_root=artifact_root)
+
+    def compile_yaml_file(
+        self,
+        source: Path,
+        *,
+        artifact_root: Path | None = None,
+    ) -> Report:
+        """Explicit compatibility input for existing analytics report definitions."""
         document = self._load_yaml(source)
         report = self._compile_report(document, source)
         try:

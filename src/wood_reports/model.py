@@ -44,6 +44,18 @@ class ReportMetadata:
     source: str | None = None
     renderer_hints: RendererHints = field(default_factory=dict)
 
+    doc_type: str | None = None
+    doc_name: str | None = None
+    profile_version: str | None = None
+    client: str | None = None
+    project: str | None = None
+    engagement: str | None = None
+    version: str | None = None
+    audience: str | None = None
+    confidentiality: str | None = None
+    period: str | None = None
+    comparison_period: str | None = None
+
     def validate(self, element: str = "metadata") -> None:
         _require_text(self.title, f"{element}.title")
 
@@ -54,6 +66,8 @@ class Narrative:
 
     text: str
     renderer_hints: RendererHints = field(default_factory=dict)
+    kind: Literal["prose", "list", "callout", "heading", "code"] = "prose"
+    semantic: str | None = None
 
     def validate(self, element: str) -> None:
         _require_text(self.text, f"{element}.text")
@@ -164,6 +178,7 @@ class Section:
     title: str
     content: tuple[ReportContent, ...]
     renderer_hints: RendererHints = field(default_factory=dict)
+    semantic: str | None = None
 
     def validate(self, element: str, artifact_root: Path) -> None:
         _require_text(self.title, f"{element}.title")
