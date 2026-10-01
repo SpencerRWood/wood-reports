@@ -67,3 +67,6 @@ implementation workbook in the Wood Reports Google Drive project folder.
 Both renderers use the versioned [Wood Analytics publication theme](docs/publication-design-system.md)
 with shared Markdown primitives and tokens aligned with wood-charts. Generated
 manifests record the theme and brand revisions.
+
+See [portable LaTeX workspaces](docs/latex-workspaces.md) for deterministic source
+publication, LuaLaTeX build metadata, cross-references, and human extensions.

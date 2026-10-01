@@ -16,6 +16,86 @@ from wood_reports import (
 )
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        r"\input{/etc/passwd}",
+        r"\def\x{y}",
+        r"\write18{command}",
+        r"\textbf{unclosed",
+        "unmatched}",
+        "% comment",
+        "x" * 4097,
+    ],
+)
+def test_rejects_unbounded_raw_latex(tmp_path: Path, text: str) -> None:
+    report = Report(
+        ReportMetadata("Test"),
+        (Section("Results", (Narrative(text, {"latex.raw": "inline"}),)),),
+    )
+    with pytest.raises(LatexRenderError, match="raw inline"):
+        LatexRenderer().render(report, tmp_path / "report.tex", artifact_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        {"latex.ref": "missing"},
+        {"latex.ref": "bad}\\input{x}"},
+        {"latex.raw": "document"},
+    ],
+)
+def test_rejects_invalid_reference_or_raw_mode(
+    tmp_path: Path, hint: dict[str, str]
+) -> None:
+    report = Report(
+        ReportMetadata("Test"), (Section("Results", (Narrative("Text", hint),)),)
+    )
+    with pytest.raises(LatexRenderError):
+        LatexRenderer().render(report, tmp_path / "report.tex", artifact_root=tmp_path)
+
+
+@pytest.mark.parametrize("label", ["same", "unsafe}\\input{x}"])
+def test_rejects_duplicate_or_unsafe_labels(tmp_path: Path, label: str) -> None:
+    report = Report(
+        ReportMetadata("Test"),
+        (
+            Section("First", (Narrative("Text"),), {"latex.label": label}),
+            Section("Second", (Narrative("Text"),), {"latex.label": label}),
+        ),
+    )
+    with pytest.raises(LatexRenderError):
+        LatexRenderer().render(report, tmp_path / "report.tex", artifact_root=tmp_path)
+
+
+def test_labeled_longtable_without_caption_and_source_notes(tmp_path: Path) -> None:
+    report = Report(
+        ReportMetadata("Test"),
+        (
+            Section(
+                "Results",
+                (
+                    PublicationTable(
+                        (TableColumn("x", "X"),),
+                        ((1,),),
+                        renderer_hints={
+                            "latex.layout": "longtable",
+                            "latex.label": "tab:values",
+                            "latex.source": "Data & evidence",
+                        },
+                    ),
+                    Narrative("See values", {"latex.ref": "tab:values"}),
+                ),
+            ),
+        ),
+    )
+    output = LatexRenderer().render(
+        report, tmp_path / "report.tex", artifact_root=tmp_path
+    )
+    assert r"\caption{}\label{tab:values}" in output.read_text()
+    assert r"\WoodSource{Data \& evidence}" in output.read_text()
+
+
 def test_renders_native_latex_structures(tmp_path: Path) -> None:
     chart = tmp_path / "trend.png"
     chart.touch()
