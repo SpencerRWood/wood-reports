@@ -1,0 +1,6 @@
+[tool.wood_reports.clsi]
+url = "https://clsi.woodhost.cloud"
+timeout_seconds = 120
+
+[tool.wood_reports.publication.branding]
+font_policy = "strict"
