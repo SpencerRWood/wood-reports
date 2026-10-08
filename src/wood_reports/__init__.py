@@ -46,6 +46,11 @@ from wood_reports.profiles import (
     list_profiles,
     scaffold_markdown,
 )
+from wood_reports.publication import (
+    PreviewResult,
+    PublicationAPI,
+    ReleaseUnavailableError,
+)
 from wood_reports.run import Comparison, ReportRun, ReportRunError
 from wood_reports.sources import (
     DriveFile,
@@ -92,15 +97,18 @@ __all__ = [
     "OutputExistsError",
     "PowerPointRenderError",
     "PowerPointRenderer",
+    "PreviewResult",
     "PrimitiveStyle",
     "ProfileSection",
     "ProfileValidationError",
+    "PublicationAPI",
     "PublicationColors",
     "PublicationGeometry",
     "PublicationSpacing",
     "PublicationTable",
     "PublicationTheme",
     "PublicationTypography",
+    "ReleaseUnavailableError",
     "Report",
     "ReportCompiler",
     "ReportGenerationAPI",

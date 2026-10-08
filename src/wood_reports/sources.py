@@ -143,20 +143,8 @@ class GoogleDriveReader:
         ).decode("utf-8-sig")
 
 
-def compile_drive_report(  # noqa: PLR0913
-    reference: str,
-    reader: DriveReader,
-    *,
-    artifact_root: Path,
-    values: TemplateValues | None = None,
-    doc_type: str | None = None,
-    doc_name: str | None = None,
-) -> Report:
-    """Resolve one report.md and compile metadata from its front matter.
-
-    Local chart references are validated against caller-provided artifacts;
-    logical chart identities can be resolved downstream by the chart registry.
-    """
+def read_drive_markdown(reference: str, reader: DriveReader) -> tuple[Path, str]:
+    """Resolve one stored Markdown source without changing its authoring content."""
     source = Path("drive-report.md")
     try:
         file = reader.metadata(drive_file_id(reference))
@@ -177,6 +165,20 @@ def compile_drive_report(  # noqa: PLR0913
         text = reader.read_text(file.identity)
     except (ValueError, OSError) as error:
         raise SourceCompilationError(source, "drive", str(error)) from error
+    return source, text
+
+
+def compile_drive_report(  # noqa: PLR0913
+    reference: str,
+    reader: DriveReader,
+    *,
+    artifact_root: Path,
+    values: TemplateValues | None = None,
+    doc_type: str | None = None,
+    doc_name: str | None = None,
+) -> Report:
+    """Resolve one report.md; validate charts against caller-provided artifacts."""
+    source, text = read_drive_markdown(reference, reader)
     return MarkdownReportCompiler(values).compile_text(
         text,
         source=source,

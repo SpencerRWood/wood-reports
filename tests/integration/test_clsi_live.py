@@ -15,6 +15,7 @@ from wood_reports import (
     ReportCompiler,
     scaffold_markdown,
 )
+from wood_reports.cli import main
 
 
 @pytest.fixture
@@ -88,3 +89,28 @@ def test_deployed_clsi_compiles_branded_markdown_and_retains_failure_logs(
     assert failure.logs
     assert any("Undefined" in path.read_text(errors="replace") for path in failure.logs)
     assert not (tmp_path / "failure" / "report.pdf").exists()
+
+
+def test_native_cli_deployed_clsi_preview(
+    backend: CLSICompiler,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "report.md"
+    source.write_text(
+        "\n".join(
+            line + "\n\nNative CLI verification." if line.startswith("## ") else line
+            for line in scaffold_markdown(
+                "decision-memo", "native-cli-verification"
+            ).splitlines()
+        )
+    )
+    monkeypatch.setattr("wood_reports.cli._compiler", lambda _config: backend)
+    output = tmp_path / "preview"
+    assert main(["validate", str(source), "--json"]) == 0
+    capsys.readouterr()
+    assert main(["preview", str(source), "--output", str(output), "--json"]) == 0
+    assert '"status": "success"' in capsys.readouterr().out
+    assert (output / "compilation/report.pdf").read_bytes().startswith(b"%PDF-")
+    assert (output / "compilation/compilation.json").exists()

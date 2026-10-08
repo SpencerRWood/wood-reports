@@ -91,8 +91,8 @@ Metadata comes from the source. Optional `doc_type` and `doc_name` arguments are
 overrides for recovery or automation. A caller can supply the `DriveReader` protocol
 instead of the OAuth HTTP adapter. Local chart artifacts remain caller-owned and must
 be supplied under `artifact_root`; logical charts resolve downstream. The library does
-not acquire credentials or depend on Wood Tools. Native CLI commands are delivered by
-the separate R2 CLI story, using this same compilation API.
+not acquire credentials or depend on Wood Tools. The [native CLI](native-cli.md)
+uses this same compilation API.
 
 ## Existing YAML consumers
 
