@@ -8,6 +8,10 @@ The installed `wood-report` executable provides profile inspection, Markdown
 creation/import, source validation, and CLSI previews. See the
 [native CLI guide](docs/native-cli.md) for commands, credentials, and release limits.
 
+The [internal example corpus](examples/internal/README.md) provides all four
+initial profiles and a synthetic Wood Charts visualization, with executable
+native CLI validation and immutable CLSI/PDF release acceptance.
+
 ## Initial scope
 
 - A renderer-neutral report model for sections, findings, charts, and publication tables.

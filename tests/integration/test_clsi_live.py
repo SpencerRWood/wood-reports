@@ -3,9 +3,14 @@
 import base64
 import json
 import os
+import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+from PIL import Image
+from pypdf import PdfReader
 
 from wood_reports import (
     CLSICompiler,
@@ -140,3 +145,77 @@ def test_native_cli_deployed_clsi_preview(
     assert manifest["validation"]["status"] == "passed"
     assert manifest["source"]["semantic_sha256"]
     assert manifest["pdf"]["sha256"]
+
+
+def test_internal_corpus_native_cli_releases_all_profiles(
+    backend: CLSICompiler, tmp_path: Path
+) -> None:
+    """Real CLI/CLSI acceptance; no fake compiler or source/workspace adapter."""
+    del backend  # Reuse the existing credential/configuration readiness fixture.
+    resource_url = os.environ.get("WOOD_REPORTS_INTERNAL_CHART_URL")
+    if not resource_url:
+        pytest.fail("Provide WOOD_REPORTS_INTERNAL_CHART_URL for the corpus PNG bytes")
+    resources = tmp_path / "resources.json"
+    resources.write_text(
+        json.dumps({"generated/assets/1-weekly-sessions.png": resource_url})
+    )
+    corpus = Path(__file__).parents[2] / "examples" / "internal"
+    output = Path(
+        os.environ.get(
+            "WOOD_REPORTS_INTERNAL_OUTPUT", str(tmp_path / "internal-releases")
+        )
+    )
+    result = subprocess.run(  # noqa: S603 -- fixed local CLI and authored fixture
+        [
+            sys.executable,
+            str(corpus / "publish.py"),
+            "release",
+            "--output",
+            str(output),
+            "--build-epoch",
+            "1791460800",
+            "--resource-urls",
+            str(resources),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    summary = json.loads((output / "corpus.json").read_text())
+    assert summary["status"] == "passed"
+    assert len(summary["documents"]) == 4
+    for record in summary["documents"].values():
+        assert record["pages"] > 0
+        assert record["checked_artifacts"] > 0
+    for profile, record in summary["documents"].items():
+        reader = PdfReader(record["pdf"])
+        text = "\n".join(page.extract_text() for page in reader.pages)
+        compact_text = re.sub(r"\s+", "", text)
+        assert "Internal" in text
+        assert "syntheticexample" in compact_text
+        assert "WoodAnalytics" in compact_text
+        assert "Appendix" in text
+        links = {
+            annotation.get_object()["/A"]["/URI"]
+            for page in reader.pages
+            for annotation in page.get("/Annots", [])
+            if annotation.get_object().get("/A", {}).get("/URI")
+        }
+        expected = set(
+            re.findall(r"\]\((https://[^)]+)\)", (corpus / f"{profile}.md").read_text())
+        )
+        assert expected <= links
+        if profile == "analytics-report":
+            assert "7,000" in text
+            assert "280" in text
+            assert "4.00%" in text
+            with Image.open(corpus / "assets/weekly-sessions.png") as source:
+                expected_pixels = source.convert("RGB").tobytes()
+            assert any(
+                image.image.convert("RGB").tobytes() == expected_pixels
+                for page in reader.pages
+                for image in page.images
+                if image.image is not None
+            )
