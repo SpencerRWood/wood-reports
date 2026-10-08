@@ -4,6 +4,10 @@ Wood Reports is a typed Python publication library for analytics repositories. I
 one report definition into format-appropriate PowerPoint and LaTeX outputs while leaving
 analysis, metrics, and chart construction to the consuming project.
 
+The installed `wood-report` executable provides profile inspection, Markdown
+creation/import, source validation, and CLSI previews. See the
+[native CLI guide](docs/native-cli.md) for commands, credentials, and release limits.
+
 ## Initial scope
 
 - A renderer-neutral report model for sections, findings, charts, and publication tables.
