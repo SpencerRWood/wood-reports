@@ -31,6 +31,7 @@ class CompilationInputs:
     entrypoint: str
     resources: tuple[dict[str, str], ...]
     fingerprints: dict[str, str]
+    flags: tuple[str, ...] = ()
 
 
 def _manifest(workspace: Path) -> tuple[str, str, PurePosixPath]:
@@ -109,4 +110,6 @@ def read_workspace(
         raise ValueError("workspace entrypoint must identify an included .tex file")
     if set(resource_urls) - fingerprints.keys():
         raise ValueError("resource URLs refer to files outside the compilation inputs")
-    return CompilationInputs(engine, entrypoint, tuple(resources), fingerprints)
+    configuration = str(PurePosixPath(entrypoint).parent / "latexmkrc")
+    flags = ("-r", configuration) if configuration in fingerprints else ()
+    return CompilationInputs(engine, entrypoint, tuple(resources), fingerprints, flags)

@@ -65,6 +65,11 @@ and pass `resource_urls={"generated/assets/chart.png": "https://..."}`. Every bi
 file requires an explicit URL; no asset is silently omitted. The adapter submits
 the complete resource list with the original root document and engine unchanged.
 
+Bibliography workspaces supply a generated `latexmkrc` through CLSI's supported
+`flags` option. It selects the installed TeX Live biber binary and latexmk runs
+LuaLaTeX/biber until navigation stabilizes. Missing biber fails explicitly;
+there is no bibliography downgrade. See the [shared citation contract](architecture-profile.md).
+
 CLSI must be able to reach the publisher from its own network; public internet
 reachability is not assumed. The current compiler is on an internal network.
 HTTPS resource URLs are preferred; explicitly supplied HTTP URLs support trusted
@@ -117,4 +122,6 @@ Each integration attempt uses at most a 20-second compile/download budget plus
 five-second cleanup, fitting both attempts inside the Wood check's 60-second limit.
 Requested integration checks fail when credentials or the fixture URL
 are missing; normal unit validation skips live integration unless `--run-clsi`
-is provided. Full logs and the source-bound verification record are owned by Wood.
+is provided. The internal corpus runs as a separate required
+`internal-corpus-publication` check with its own 60-second budget. Full logs and
+the source-bound verification record are owned by Wood.

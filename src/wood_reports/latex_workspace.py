@@ -10,6 +10,8 @@ from dataclasses import asdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from wood_reports.citations import BIBLATEX_LATEXMKRC
+from wood_reports.diagrams import RENDERER_ID, RENDERER_VERSION, ArchitectureDiagram
 from wood_reports.latex import LatexRenderer
 from wood_reports.model import Report
 
@@ -72,6 +74,20 @@ class LatexWorkspacePublisher:
                 staging / "report.tex",
                 artifact_root=artifact_root,
             )
+            if report.bibliography:
+                (staging / "latexmkrc").write_text(BIBLATEX_LATEXMKRC, encoding="utf-8")
+            diagrams = [
+                item
+                for section in report.content_sections
+                for item in section.content
+                if isinstance(item, ArchitectureDiagram)
+            ]
+            if diagrams:
+                (staging / "assets").mkdir(exist_ok=True)
+                for index, diagram in enumerate(diagrams, 1):
+                    (staging / "assets" / f"diagram-{index}.mmd").write_text(
+                        diagram.source + "\n", encoding="utf-8"
+                    )
             source = staging / "report.tex"
             text = source.read_text(encoding="utf-8")
             preamble_text, body_text = text.split(r"\begin{document}", 1)
@@ -111,15 +127,29 @@ class LatexWorkspacePublisher:
                 "engine": "lualatex",
                 "build": {
                     "working_directory": self._generated_directory,
-                    "argv": [
-                        "lualatex",
-                        "-no-shell-escape",
-                        "-interaction=nonstopmode",
-                        "-halt-on-error",
-                        "-output-directory=build",
-                        "report.tex",
-                    ],
-                    "passes": 2,
+                    "argv": (
+                        [
+                            "latexmk",
+                            "-r",
+                            "latexmkrc",
+                            "-lualatex",
+                            "-no-shell-escape",
+                            "-interaction=nonstopmode",
+                            "-halt-on-error",
+                            "-outdir=build",
+                            "report.tex",
+                        ]
+                        if report.bibliography
+                        else [
+                            "lualatex",
+                            "-no-shell-escape",
+                            "-interaction=nonstopmode",
+                            "-halt-on-error",
+                            "-output-directory=build",
+                            "report.tex",
+                        ]
+                    ),
+                    "passes": 3 if report.bibliography else 2,
                     "output_directory": f"{self._generated_directory}/build",
                 },
                 "profile": {
@@ -140,6 +170,20 @@ class LatexWorkspacePublisher:
                 },
                 "files": self._fingerprints(staging),
             }
+            if report.bibliography:
+                manifest["bibliography"] = {
+                    "backend": "biber",
+                    "driver": "latexmk",
+                    "sequence": ["lualatex", "biber", "lualatex", "lualatex"],
+                    "sources": "sources.bib",
+                    "entries": len(report.bibliography),
+                }
+            if diagrams:
+                manifest["diagrams"] = {
+                    "renderer": RENDERER_ID,
+                    "version": RENDERER_VERSION,
+                    "sources": len(diagrams),
+                }
             (staging / "workspace.json").write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )

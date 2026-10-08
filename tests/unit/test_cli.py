@@ -90,7 +90,7 @@ def test_profile_list_and_show_expose_full_contracts(
 ) -> None:
     assert main(["profile", "list", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
-    assert len(result["data"]["profiles"]) == 4
+    assert len(result["data"]["profiles"]) == 5
     assert main(["profile", "show", "decision-memo", "--json"]) == 0
     profile = json.loads(capsys.readouterr().out)["data"]["profile"]
     assert profile["version"] == get_profile("decision-memo").version

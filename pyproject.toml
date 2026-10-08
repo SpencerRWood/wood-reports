@@ -66,7 +66,19 @@ retry_safe = true
 
 [[tool.wood.verify.checks]]
 name = "clsi-compilation"
-argv = ["uv", "run", "pytest", "tests/integration/test_clsi_live.py", "--run-clsi", "-q"]
+argv = ["uv", "run", "pytest", "tests/integration/test_clsi_live.py", "--run-clsi", "-q", "-k", "not internal_corpus"]
+required = true
+timeout_seconds = 60
+
+[[tool.wood.verify.checks]]
+name = "internal-corpus-publication"
+argv = ["uv", "run", "pytest", "tests/integration/test_clsi_live.py", "--run-clsi", "-q", "-k", "internal_corpus"]
+required = true
+timeout_seconds = 60
+
+[[tool.wood.verify.checks]]
+name = "architecture-biber-publication"
+argv = ["uv", "run", "pytest", "tests/integration/test_architecture_live.py", "--run-clsi", "-q"]
 required = true
 timeout_seconds = 60
 

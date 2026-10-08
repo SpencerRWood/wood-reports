@@ -18,6 +18,7 @@ def test_initial_profiles_are_versioned_typed_and_semantically_distinct() -> Non
         "analytics-report",
         "assessment-report",
         "decision-memo",
+        "technical-architecture",
     }
     assert all(profile.version == "1.0.0" for profile in profiles)
     assert "what the data shows" in get_profile("analytics-report").purpose

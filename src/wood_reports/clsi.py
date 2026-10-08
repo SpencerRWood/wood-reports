@@ -189,6 +189,7 @@ class CLSICompiler:
                         "timeout": max(1, int(self.config.timeout_seconds * 0.8)),
                         "stopOnFirstError": True,
                         "syncType": "full",
+                        **({"flags": inputs.flags} if inputs.flags else {}),
                     },
                     "rootResourcePath": inputs.entrypoint,
                     "resources": inputs.resources,

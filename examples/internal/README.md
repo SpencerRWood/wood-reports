@@ -113,8 +113,8 @@ wood repo validate --json
 wood repo verify --json
 ```
 
-The repository-owned CLSI check now includes the two existing integration tests
-and the full corpus test within the existing 60-second verification budget.
+Repository-owned verification runs the two compiler integration tests and the
+full corpus test as separate required checks, each with a 60-second budget.
 The corpus test requires nonempty releases,
 all source hyperlink destinations, branding/confidentiality text and a byte-exact
 decoded RGB match between the authored PNG and the figure embedded in the PDF.

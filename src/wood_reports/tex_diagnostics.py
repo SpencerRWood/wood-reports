@@ -59,6 +59,21 @@ _PATTERNS = (
 )
 
 
+def diagnostic_log_text(text: str) -> str:
+    """Exclude biblatex's informational probes for its optional default files.
+
+    These are successful package discovery messages, not missing source assets.
+    Keep their newlines so diagnostic line numbers still match the retained log.
+    """
+    return re.sub(
+        r"^Package biblatex Info: \.\.\. file "
+        r"'(?:authortitle\.dbx|biblatex-dm\.cfg)' not found\.$",
+        "",
+        text,
+        flags=re.M,
+    )
+
+
 def parse_tex_diagnostics(
     text: str, *, log: str = "compiler.log", underfull_badness: int = 1000
 ) -> tuple[CompilerDiagnostic, ...]:
@@ -70,6 +85,7 @@ def parse_tex_diagnostics(
     if type(underfull_badness) is not int or not 0 <= underfull_badness <= 10000:
         raise ValueError("underfull_badness must be an integer from 0 to 10000")
     diagnostics: list[CompilerDiagnostic] = []
+    text = diagnostic_log_text(text)
     claimed: list[tuple[int, int]] = []
     for category, severity, pattern in _PATTERNS:
         contexts: list[DiagnosticContext] = []

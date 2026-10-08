@@ -12,6 +12,11 @@ The [internal example corpus](examples/internal/README.md) provides all four
 initial profiles and a synthetic Wood Charts visualization, with executable
 native CLI validation and immutable CLSI/PDF release acceptance.
 
+The native [architecture profile](docs/architecture-profile.md) adds source-owned
+technical sections, vector diagrams, multipage tables and shared biblatex/biber
+citations. Its [Overview fixture](examples/architecture/README.md) preserves
+canonical architecture facts and provenance for design review.
+
 ## Initial scope
 
 - A renderer-neutral report model for sections, findings, charts, and publication tables.

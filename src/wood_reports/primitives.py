@@ -117,7 +117,7 @@ def latex_identifier(text: str) -> str:
     )
 
 
-def _technical_prose(text: str) -> str:
+def latex_prose(text: str) -> str:
     parts: list[str] = []
     position = 0
     for match in _TECHNICAL.finditer(text):
@@ -132,17 +132,19 @@ def _technical_prose(text: str) -> str:
     return "".join(parts)
 
 
+def latex_text_run(run: TextRun, value: str | None = None) -> str:
+    """Apply authored formatting around already-rendered inline semantics."""
+    value = latex_prose(run.text) if value is None else value
+    if run.code:
+        value = f"\\texttt{{{latex_identifier(run.text)}}}"
+    if run.italic:
+        value = f"\\emph{{{value}}}"
+    if run.bold:
+        value = f"\\textbf{{{value}}}"
+    if run.hyperlink:
+        value = f"\\href{{{latex_escape(run.hyperlink)}}}{{{value}}}"
+    return value
+
+
 def latex_inline(text: str) -> str:
-    parts: list[str] = []
-    for run in text_runs(text):
-        value = _technical_prose(run.text)
-        if run.code:
-            value = f"\\texttt{{{latex_identifier(run.text)}}}"
-        if run.italic:
-            value = f"\\emph{{{value}}}"
-        if run.bold:
-            value = f"\\textbf{{{value}}}"
-        if run.hyperlink:
-            value = f"\\href{{{latex_escape(run.hyperlink)}}}{{{value}}}"
-        parts.append(value)
-    return "".join(parts)
+    return "".join(latex_text_run(run) for run in text_runs(text))

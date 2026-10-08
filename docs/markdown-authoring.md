@@ -52,6 +52,11 @@ text metadata includes subtitle, author, source, client, project, engagement, ve
 audience, confidentiality, period, and comparison_period. Quote dates and versions to
 keep YAML values textual. Unknown fields and duplicate keys fail validation.
 
+Structured `references` and source footnotes are supported across profiles by
+the shared biblatex/biber infrastructure. The native
+[`technical-architecture` contract](architecture-profile.md) documents citation
+keys, provenance fields, technical sections, diagrams and composition options.
+
 The initial profiles are project-brief, analytics-report, assessment-report, and
 decision-memo. Inspect `list_profiles()` or `get_profile()` for their exact required
 and optional sections. Analytics supports both the detailed section contract and a
