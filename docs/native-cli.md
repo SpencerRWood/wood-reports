@@ -50,10 +50,11 @@ original Markdown without changing its profile/name. Local assets must already
 exist under `--artifact-root`; no asset uploads, token acquisition, or refresh
 are implicit.
 
-`build --release` is exposed and fails closed before creating outputs or
-contacting CLSI. Strict PDF validation and release packaging belong to the
-successor Story #434. Until that backend is implemented, it returns an explicit
-unavailable error; a preview PDF is never silently treated as a release.
+`build --release` invokes strict PDF validation and immutable versioned packaging.
+Set a report `version` in front matter and provide `--build-epoch` or
+`SOURCE_DATE_EPOCH` as an explicit Unix timestamp. `--source-revision` records
+caller-supplied source provenance. See [PDF releases](pdf-releases.md) for gates,
+the manifest schema, failure diagnostics, and retry behavior.
 
 All operations accept `--json`. Results have `schema_version`, `command`,
 `status`, and `data` on success; failures include `error` and, for compilation
