@@ -1,6 +1,7 @@
 """Opt-in deployed compiler acceptance; missing requested credentials fail clearly."""
 
 import base64
+import json
 import os
 from pathlib import Path
 
@@ -101,9 +102,12 @@ def test_native_cli_deployed_clsi_preview(
     source.write_text(
         "\n".join(
             line + "\n\nNative CLI verification." if line.startswith("## ") else line
-            for line in scaffold_markdown(
-                "decision-memo", "native-cli-verification"
-            ).splitlines()
+            for line in scaffold_markdown("decision-memo", "native-cli-verification")
+            .replace(
+                "title: Native Cli Verification",
+                'title: Native Cli Verification\nversion: "1.0.0"',
+            )
+            .splitlines()
         )
     )
     monkeypatch.setattr("wood_reports.cli._compiler", lambda _config: backend)
@@ -114,3 +118,25 @@ def test_native_cli_deployed_clsi_preview(
     assert '"status": "success"' in capsys.readouterr().out
     assert (output / "compilation/report.pdf").read_bytes().startswith(b"%PDF-")
     assert (output / "compilation/compilation.json").exists()
+    releases = tmp_path / "releases"
+    assert (
+        main(
+            [
+                "build",
+                str(source),
+                "--release",
+                "--output",
+                str(releases),
+                "--build-epoch",
+                "1700000000",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    released = json.loads(capsys.readouterr().out)["data"]
+    assert Path(released["pdf"]).is_file()
+    manifest = json.loads(Path(released["manifest"]).read_text())
+    assert manifest["validation"]["status"] == "passed"
+    assert manifest["source"]["semantic_sha256"]
+    assert manifest["pdf"]["sha256"]

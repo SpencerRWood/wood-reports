@@ -33,6 +33,13 @@ from wood_reports.model import (
     Section,
     TableColumn,
 )
+from wood_reports.pdf_validation import (
+    PDFValidationError,
+    PDFValidationResult,
+    ValidationIssue,
+    validate_pdf,
+    validate_release_report,
+)
 from wood_reports.pipeline import (
     ChartGenerationContext,
     ChartResolutionError,
@@ -49,7 +56,12 @@ from wood_reports.profiles import (
 from wood_reports.publication import (
     PreviewResult,
     PublicationAPI,
-    ReleaseUnavailableError,
+)
+from wood_reports.release import (
+    ReleasePublisher,
+    ReleaseResult,
+    release_manifest,
+    semantic_content_digest,
 )
 from wood_reports.run import Comparison, ReportRun, ReportRunError
 from wood_reports.sources import (
@@ -95,6 +107,8 @@ __all__ = [
     "MarkdownReportCompiler",
     "Narrative",
     "OutputExistsError",
+    "PDFValidationError",
+    "PDFValidationResult",
     "PowerPointRenderError",
     "PowerPointRenderer",
     "PreviewResult",
@@ -108,7 +122,8 @@ __all__ = [
     "PublicationTable",
     "PublicationTheme",
     "PublicationTypography",
-    "ReleaseUnavailableError",
+    "ReleasePublisher",
+    "ReleaseResult",
     "Report",
     "ReportCompiler",
     "ReportGenerationAPI",
@@ -123,11 +138,16 @@ __all__ = [
     "SourceCompilationError",
     "TableColumn",
     "TargetStatus",
+    "ValidationIssue",
     "WorkspaceCompiler",
     "compile_drive_report",
     "get_profile",
     "list_profiles",
+    "release_manifest",
     "scaffold_markdown",
+    "semantic_content_digest",
+    "validate_pdf",
+    "validate_release_report",
 ]
 
 

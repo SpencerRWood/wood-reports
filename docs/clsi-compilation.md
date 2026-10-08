@@ -99,8 +99,9 @@ TeX errors; the adapter rejects that partial output based on the compiler logs.
 Cleanup failures fail the operation and withhold
 the PDF. Existing output directories are never overwritten. Local filesystem
 configuration/input errors are raised directly before compilation; downstream
-publication must consume only a successful `CompilationResult`. Semantic PDF
-validation and release packaging belong to later Story #434.
+publication must consume only a successful `CompilationResult`. Downstream
+[PDF validation and release packaging](pdf-releases.md) apply stricter gates
+before a PDF becomes a delivered artifact.
 
 ## Integration verification
 

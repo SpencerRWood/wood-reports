@@ -15,11 +15,8 @@ from wood_reports.latex_workspace import LatexWorkspacePublisher
 from wood_reports.markdown import MarkdownReportCompiler
 from wood_reports.model import Report
 from wood_reports.profiles import scaffold_markdown
+from wood_reports.release import ReleasePublisher, ReleaseResult
 from wood_reports.sources import DriveReader, compile_drive_report, read_drive_markdown
-
-
-class ReleaseUnavailableError(RuntimeError):
-    """Strict publication is unavailable until a release validator is installed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,9 +114,27 @@ class PublicationAPI:
         )
         return PreviewResult(result, warnings)
 
-    def release(self) -> None:
-        """Fail closed until Story #434 supplies strict PDF release packaging."""
-        raise ReleaseUnavailableError(
-            "strict PDF release validation and packaging are unavailable; "
-            "Story #434 must supply the release backend; no artifact was published"
+    def release(  # noqa: PLR0913
+        self,
+        source: str,
+        destination: Path,
+        *,
+        compiler: WorkspaceCompiler,
+        build_epoch: int,
+        artifact_root: Path | None = None,
+        reader: DriveReader | None = None,
+        source_revision: str | None = None,
+        resource_urls: Mapping[str, str] | None = None,
+    ) -> ReleaseResult:
+        """Validate and publish an immutable version; retain failed attempt evidence."""
+        report = self.validate(source, artifact_root=artifact_root, reader=reader)
+        return ReleasePublisher().publish(
+            report,
+            destination,
+            compiler=compiler,
+            artifact_root=artifact_root or Path(source).parent,
+            source_identity=source if reader is not None else Path(source).name,
+            source_revision=source_revision,
+            build_epoch=build_epoch,
+            resource_urls=resource_urls,
         )

@@ -28,6 +28,7 @@ def test_project_metadata_describes_wood_reports() -> None:
     assert project["dependencies"] == [
         "jinja2>=3.1",
         "markdown-it-py>=4.0,<5",
+        "pypdf>=6,<7",
         "pyyaml>=6.0",
     ]
     assert project["optional-dependencies"]["powerpoint"] == ["python-pptx>=1.0"]

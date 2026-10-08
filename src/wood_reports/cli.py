@@ -11,8 +11,9 @@ from typing import cast
 
 from wood_reports.clsi import CLSICompiler
 from wood_reports.compilation import CLSIConfig, CLSICredentials, CompilationError
+from wood_reports.pdf_validation import PDFValidationError
 from wood_reports.profiles import get_profile, list_profiles
-from wood_reports.publication import PublicationAPI, ReleaseUnavailableError
+from wood_reports.publication import PublicationAPI
 from wood_reports.sources import GoogleDriveReader
 
 
@@ -46,6 +47,8 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--resource-urls", type=Path)
         if name == "build":
             command.add_argument("--release", action="store_true")
+            command.add_argument("--build-epoch", type=int)
+            command.add_argument("--source-revision")
     return parser
 
 
@@ -90,14 +93,36 @@ def _execute(args: argparse.Namespace, api: PublicationAPI) -> dict[str, object]
             artifact_root=args.artifact_root,
         )
         return {"source": str(path)}
-    if args.command == "build" and args.release:
-        api.release()
     reader = _reader() if args.drive else None
     if args.command == "validate":
         report = api.validate(
             args.source, artifact_root=args.artifact_root, reader=reader
         )
         return {"validation_scope": "source", "document": asdict(report.metadata)}
+    if args.command == "build" and args.release:
+        epoch = args.build_epoch
+        if epoch is None:
+            configured = os.environ.get("SOURCE_DATE_EPOCH")
+            if configured is None:
+                raise ValueError("release requires --build-epoch or SOURCE_DATE_EPOCH")
+            epoch = int(configured)
+        released = api.release(
+            args.source,
+            args.output,
+            compiler=_compiler(args.config),
+            build_epoch=epoch,
+            artifact_root=args.artifact_root,
+            reader=reader,
+            source_revision=args.source_revision,
+            resource_urls=_resources(args.resource_urls),
+        )
+        return {
+            "release": True,
+            "directory": str(released.directory),
+            "pdf": str(released.pdf),
+            "manifest": str(released.manifest),
+            "validation": asdict(released.validation),
+        }
     result = api.preview(
         args.source,
         args.output,
@@ -124,7 +149,12 @@ def main(argv: list[str] | None = None) -> int:
     except CompilationError as error:
         payload.update(status="failed", error=str(error), data=asdict(error.result))
         code = 1
-    except (ValueError, OSError, ReleaseUnavailableError) as error:
+    except PDFValidationError as error:
+        payload.update(
+            status="failed", error=str(error), data={"validation": asdict(error.result)}
+        )
+        code = 1
+    except (ValueError, OSError) as error:
         payload.update(status="failed", error=str(error))
         code = 1
     if args.json:

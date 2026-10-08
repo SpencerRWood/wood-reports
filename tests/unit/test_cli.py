@@ -11,7 +11,6 @@ from wood_reports import (
     CompilationResult,
     DriveFile,
     PublicationAPI,
-    ReleaseUnavailableError,
     SourceCompilationError,
     get_profile,
     scaffold_markdown,
@@ -250,17 +249,16 @@ def test_cli_failure_returns_compilation_evidence(
     assert payload["data"]["manifest"].endswith("compilation.json")
 
 
-def test_release_fails_closed_before_credentials_or_output(
-    source: Path, capsys: pytest.CaptureFixture[str]
+def test_release_requires_reproducible_epoch_before_credentials_or_output(
+    source: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    with pytest.raises(ReleaseUnavailableError):
-        PublicationAPI().release()
+    monkeypatch.delenv("SOURCE_DATE_EPOCH", raising=False)
     output = source.parent / "release"
     assert (
         main(["build", str(source), "--release", "--output", str(output), "--json"])
         == 1
     )
-    assert "#434" in json.loads(capsys.readouterr().out)["error"]
+    assert "SOURCE_DATE_EPOCH" in json.loads(capsys.readouterr().out)["error"]
     assert not output.exists()
 
 
