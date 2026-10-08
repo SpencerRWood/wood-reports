@@ -9,6 +9,14 @@ from wood_reports.api import (
     ReportGenerationResult,
     TargetStatus,
 )
+from wood_reports.clsi import CLSICompiler
+from wood_reports.compilation import (
+    CLSIConfig,
+    CLSICredentials,
+    CompilationError,
+    CompilationResult,
+    WorkspaceCompiler,
+)
 from wood_reports.compiler import ReportCompiler, SourceCompilationError
 from wood_reports.latex import LatexRenderer, LatexRenderError
 from wood_reports.latex_workspace import LatexWorkspaceError, LatexWorkspacePublisher
@@ -61,10 +69,15 @@ if TYPE_CHECKING:
 __all__ = [
     "WOOD_ANALYTICS_THEME",
     "Appendix",
+    "CLSICompiler",
+    "CLSIConfig",
+    "CLSICredentials",
     "ChartGenerationContext",
     "ChartReference",
     "ChartResolutionError",
     "Comparison",
+    "CompilationError",
+    "CompilationResult",
     "DocumentProfile",
     "DriveFile",
     "DriveReader",
@@ -102,6 +115,7 @@ __all__ = [
     "SourceCompilationError",
     "TableColumn",
     "TargetStatus",
+    "WorkspaceCompiler",
     "compile_drive_report",
     "get_profile",
     "list_profiles",
