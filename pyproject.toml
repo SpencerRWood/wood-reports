@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wood-reports"
-version = "0.16.0"
+version = "0.17.0"
 description = "Reusable publication layer for PowerPoint and LaTeX analytical reports."
 readme = "README.md"
 requires-python = ">=3.14"
