@@ -95,6 +95,14 @@ class ReportGenerationAPI:
         )
         manifest = output / "manifest.json"
         payload = {
+            "brand": {
+                "identity": report.theme.brand_identity,
+                "revision": report.theme.brand_revision,
+            },
+            "profile": {
+                "identity": report.metadata.doc_type,
+                "revision": report.metadata.profile_version,
+            },
             "theme": {
                 "identity": report.theme.identity,
                 "revision": report.theme.revision,

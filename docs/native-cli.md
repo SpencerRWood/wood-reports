@@ -61,3 +61,11 @@ All operations accept `--json`. Results have `schema_version`, `command`,
 failures, retained artifact paths in `data`. Source validation results explicitly
 declare `validation_scope: source`. Exit codes are 0 for success, 1 for operation
 failure, and 2 for invalid command syntax (argparse usage on stderr).
+
+## Shared publication configuration
+
+Preview and build use `[tool.wood_reports.publication]` and its token/branding
+tables from the selected `--config` file. See the
+[publication design system](publication-design-system.md#central-cli-configuration)
+for portable SVG replacement, corner/cover options, font policy and independent
+brand/profile revisions. This configuration applies to every document profile.

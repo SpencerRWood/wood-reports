@@ -198,7 +198,7 @@ def test_markdown_semantics_remain_editable_in_powerpoint(tmp_path: Path) -> Non
     assert str(table.cell(0, 0).fill.fore_color.rgb) == "002F6C"
     assert str(table.cell(0, 0).text_frame.paragraphs[0].font.color.rgb) == "FFFFFF"
     assert str(table.cell(1, 0).text_frame.paragraphs[0].font.color.rgb) == "1B1B1B"
-    assert deck.core_properties.subject == "wood-analytics@1.0.0; brand@1.0.0"
+    assert deck.core_properties.subject == "wood-analytics@1.1.0; brand@1.0.0"
 
 
 def test_custom_theme_survives_materialization_and_both_manifest_targets(

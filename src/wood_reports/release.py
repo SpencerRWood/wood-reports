@@ -101,6 +101,14 @@ def release_manifest(  # noqa: PLR0913
         "wood_reports_version": version("wood-reports"),
         "renderer": {"identity": "latex", "version": version("wood-reports")},
         "profile_version": metadata.profile_version,
+        "profile": {
+            "identity": metadata.doc_type,
+            "revision": metadata.profile_version,
+        },
+        "brand": {
+            "identity": report.theme.brand_identity,
+            "revision": report.theme.brand_revision,
+        },
         "theme": {
             "identity": report.theme.identity,
             "revision": report.theme.revision,

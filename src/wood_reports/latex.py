@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from wood_reports.artifacts import materialize_chart_assets
+from wood_reports.latex_components import latex_preamble
 from wood_reports.model import (
     ChartReference,
     Finding,
@@ -15,7 +16,12 @@ from wood_reports.model import (
     Report,
     TableCell,
 )
-from wood_reports.primitives import latex_escape, latex_inline, list_entries
+from wood_reports.primitives import (
+    has_technical_text,
+    latex_escape,
+    latex_inline,
+    list_entries,
+)
 from wood_reports.theme import PublicationTheme
 
 
@@ -58,13 +64,12 @@ class _LatexDocument:
             report, artifact_root=artifact_root, assets=destination.parent / "assets"
         )
         parts = [
-            *self._preamble(report),
+            *latex_preamble(report),
             r"\begin{document}",
             f"\\title{{{latex_escape(report.metadata.title)}}}",
             f"\\author{{{latex_escape(report.metadata.author or DEFAULT_AUTHOR)}}}",
             r"\date{}",
             r"\maketitle",
-            r"\WoodWordmark",
         ]
         if report.metadata.subtitle:
             parts.append(latex_escape(report.metadata.subtitle))
@@ -114,101 +119,6 @@ class _LatexDocument:
             return self._content(parts, finding.visual, finding.title, figure, finding)
         return figure
 
-    def _preamble(self, report: Report) -> list[str]:
-        theme = self.theme
-        geometry = theme.geometry
-        typography = theme.typography
-        parts = [
-            f"\\documentclass[{typography.page_body}pt]{{article}}",
-            r"\usepackage{graphicx,booktabs,longtable}",
-            r"\usepackage[table]{xcolor}",
-            r"\usepackage{geometry,fancyhdr,caption,titlesec,iftex}",
-            r"\usepackage[hidelinks]{hyperref}",
-            f"\\geometry{{paperwidth={geometry.page_width}in,"
-            f"paperheight={geometry.page_height}in,"
-            f"margin={geometry.page_margin}in,headheight=15pt}}",
-            r"\ifPDFTeX",
-            r"\usepackage[T1]{fontenc}",
-            r"\usepackage{helvet}",
-            r"\renewcommand{\familydefault}{\sfdefault}",
-            r"\else",
-            r"\usepackage{fontspec}",
-            r"\IfFontExistsTF{"
-            + latex_escape(typography.family)
-            + r"}{\setsansfont{"
-            + latex_escape(typography.family)
-            + r"}}{\IfFontExistsTF{"
-            + latex_escape(typography.fallback)
-            + r"}{\setsansfont{"
-            + latex_escape(typography.fallback)
-            + r"}}{\setsansfont{lmsans10-regular.otf}}}",
-            r"\IfFontExistsTF{"
-            + latex_escape(typography.code_family)
-            + r"}{\setmonofont{"
-            + latex_escape(typography.code_family)
-            + r"}}{\setmonofont{lmmono10-regular.otf}}",
-            r"\renewcommand{\familydefault}{\sfdefault}",
-            r"\fi",
-        ]
-        parts.extend(
-            f"\\definecolor{{Wood{name}}}{{HTML}}{{{getattr(theme.colors, name)[1:]}}}"
-            for name in (
-                "primary",
-                "secondary",
-                "text_primary",
-                "text_muted",
-                "grid",
-                "background",
-                "warning",
-                "critical",
-            )
-        )
-        parts.extend(
-            [
-                r"\color{Woodtext_primary}",
-                r"\pagecolor{Woodbackground}",
-                f"\\setlength{{\\parskip}}{{{theme.spacing.paragraph_points}pt}}",
-                r"\setlength{\parindent}{0pt}",
-                r"\pagestyle{fancy}\fancyhf{}",
-                r"\fancyhead[L]{\small\color{Woodprimary} "
-                + latex_escape(theme.wordmark)
-                + "}",
-                r"\fancyfoot[L]{\small\color{Woodtext_muted} "
-                + latex_escape(report.metadata.confidentiality or "")
-                + "}",
-                r"\fancyfoot[R]{\small\thepage}"
-                if theme.page_numbers
-                else r"\fancyfoot[R]{}",
-                r"\fancypagestyle{plain}{\fancyhf{}"
-                + r"\fancyfoot[L]{\small\color{Woodtext_muted} "
-                + latex_escape(report.metadata.confidentiality or "")
-                + "}"
-                + (r"\fancyfoot[R]{\thepage}" if theme.page_numbers else "")
-                + "}",
-                r"\titleformat{\section}{\color{Woodprimary}\sffamily\bfseries"
-                + f"\\fontsize{{{typography.page_heading}}}"
-                + f"{{{typography.page_heading + 3}}}"
-                + r"\selectfont}{\thesection}{1em}{}",
-                r"\titleformat{\subsection}{\color{Woodprimary}\sffamily\bfseries}"
-                r"{\thesubsection}{1em}{}",
-                r"\DeclareCaptionFont{woodcaption}{"
-                + f"\\fontsize{{{typography.caption}}}{{{typography.caption + 2}}}"
-                + r"\selectfont\color{Woodtext_muted}}",
-                r"\captionsetup{font=woodcaption,labelfont=bf}",
-                r"\newcommand{\WoodWordmark}{{\color{Woodprimary}\Large\bfseries "
-                + latex_escape(theme.wordmark)
-                + "}}",
-                r"\newcommand{\WoodSource}[1]{\par{\small\color{Woodtext_muted}"
-                r"\textit{Source: #1}}\par}",
-                r"\newcommand{\WoodConfidentiality}[1]{\par{\small\bfseries #1}\par}",
-                r"\newcommand{\WoodCallout}[3]{\par\noindent"
-                r"\fcolorbox{#1}{Woodbackground}{\parbox{"
-                r"\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{"
-                r"\color{#1}\textbf{#2}\par\color{Woodtext_primary}#3}}\par}",
-            ]
-        )
-        return parts
-
     def _narrative(self, parts: list[str], item: Narrative) -> None:
         if reference := item.renderer_hints.get("latex.ref"):
             if re.fullmatch(r"[A-Za-z][A-Za-z0-9:_.-]*", reference) is None:
@@ -237,6 +147,14 @@ class _LatexDocument:
                 latex_escape(item.text).replace(" ", r"\ ").replace("\n", r"\newline{}")
             )
             parts.append(f"{{\\ttfamily {text}}}\\par")
+        elif has_technical_text(item.text):
+            parts.extend(
+                [
+                    r"\begin{WoodTechnicalParagraph}",
+                    latex_inline(item.text),
+                    r"\end{WoodTechnicalParagraph}",
+                ]
+            )
         else:
             parts.append(latex_inline(item.text) + "\n")
 
@@ -328,7 +246,12 @@ class _LatexDocument:
     def _table(
         self, parts: list[str], table: PublicationTable, finding: Finding | None
     ) -> None:
-        long = table.renderer_hints.get("latex.layout") == "longtable"
+        policy = self.theme.table_layout
+        long = table.renderer_hints.get("latex.layout") == "longtable" or (
+            not table.renderer_hints.get("latex.layout")
+            and not table.renderer_hints.get("latex.width")
+            and len(table.rows) > policy.keep_together_rows
+        )
         if long and table.renderer_hints.get("latex.width"):
             raise LatexRenderError("longtable cannot use latex.width")
         cols = "".join(
@@ -340,7 +263,35 @@ class _LatexDocument:
             "latex.label", f"tab:{finding.identity}" if finding else ""
         )
         label_command = self._label(label) if label else ""
+        parts.append(r"\begingroup\WoodTableFont\WoodTableSetup")
         if long:
+            reserve = (
+                len(table.rows)
+                if len(table.rows) <= policy.keep_together_rows
+                else max(policy.minimum_first_rows, policy.minimum_last_rows)
+            )
+            # Measure actual header/body typography, not guessed row heights.
+            parts.extend(
+                [
+                    f"\\sbox{{\\WoodTableStart}}{{\\begin{{tabular}}{{{cols}}}",
+                    r"\toprule",
+                    " & ".join(
+                        r"\bfseries " + latex_escape(c.label) for c in table.columns
+                    )
+                    + r" \\",
+                    r"\midrule",
+                    *(
+                        " & ".join(
+                            self._cell(v, c.format)
+                            for v, c in zip(row, table.columns, strict=True)
+                        )
+                        + r" \\"
+                        for row in table.rows[:reserve]
+                    ),
+                    r"\bottomrule\end{tabular}}",
+                    r"\WoodTableSpace",
+                ]
+            )
             parts.append(f"\\begin{{longtable}}{{{cols}}}")
             if table.caption or label:
                 parts.append(
@@ -364,13 +315,23 @@ class _LatexDocument:
                 r"\midrule" + (r"\endhead" if long else ""),
             ]
         )
-        parts.extend(
-            " & ".join(
-                self._cell(v, c.format) for v, c in zip(row, table.columns, strict=True)
+        for index, row in enumerate(table.rows):
+            protected = (
+                long
+                and index < len(table.rows) - 1
+                and (
+                    len(table.rows) <= policy.keep_together_rows
+                    or index < policy.minimum_first_rows - 1
+                    or index >= len(table.rows) - policy.minimum_last_rows
+                )
             )
-            + r" \\"
-            for row in table.rows
-        )
+            parts.append(
+                " & ".join(
+                    self._cell(v, c.format)
+                    for v, c in zip(row, table.columns, strict=True)
+                )
+                + (r" \WoodProtectedRowEnd" if protected else r" \\")
+            )
         parts.extend([r"\bottomrule", f"\\end{{{env}}}"])
         if not long:
             if table.caption or label:
@@ -380,12 +341,13 @@ class _LatexDocument:
             parts.append(r"\end{table}")
         if table.notes:
             parts.append(
-                "{\\small\\color{Woodtext_muted}\\textit{"
+                "{\\WoodNoteFont\\color{Woodtext_muted}\\textit{"
                 + latex_escape(" ".join(table.notes))
                 + "}}"
             )
         if source := table.renderer_hints.get("latex.source"):
             parts.append(f"\\WoodSource{{{latex_escape(source)}}}")
+        parts.append(r"\endgroup")
 
     @staticmethod
     def _cell(value: TableCell, format_spec: str | None) -> str:

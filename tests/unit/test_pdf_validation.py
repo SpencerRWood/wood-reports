@@ -64,6 +64,32 @@ def test_pdf_validation_is_deterministic(compilation: CompilationResult) -> None
     assert first.passed
     assert first.pages == 1
     assert first.pdf_sha256 is not None
+    assert first.compilation_succeeded is True
+    assert first.structural_validation_passed is True
+    assert first.visual_acceptance == "not-assessed"
+
+
+def test_ignored_glue_error_fails_gate(compilation: CompilationResult) -> None:
+    compilation.logs[0].write_text(
+        "ignored error Infinite glue shrinkage found in box being split\n" * 5
+    )
+    result = validate_pdf(compilation)
+    assert result.compilation_succeeded
+    assert not result.structural_validation_passed
+    assert result.compiler_diagnostics[0].occurrence_count == 5
+
+
+def test_typographic_warnings_remain_visible(compilation: CompilationResult) -> None:
+    compilation.logs[0].write_text(
+        "Underfull \\hbox (badness 6641) in paragraph at lines 13--14\n"
+        "Overfull \\hbox (2pt too wide)\n"
+    )
+    result = validate_pdf(compilation)
+    assert result.passed
+    assert {d.category for d in result.compiler_diagnostics} == {
+        "underfull-box",
+        "overfull-box",
+    }
 
 
 @pytest.mark.parametrize(

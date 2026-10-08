@@ -1,0 +1,10 @@
+{
+  "compiler": "This is LuaHBTeX, Version 1.24.0 (TeX Live 2026)",
+  "rasterizer": "1.28.2",
+  "dpi": 144,
+  "fonts": {
+    "IBM Plex Sans": "6b17a35a31ded2e81b3ed19e5eb532d22b9a0b5a76833b0d757a5c71ab5e0f6c",
+    "IBM Plex Sans:style=Bold": "19de5aec74215119b3f8f7d1b1f0e0eba867bee2d2c65c5761b287d67581c316",
+    "IBM Plex Mono": "84d88458fd307636a2bd1a7a9a5432b394157a4766fc4eac7895a68b63d38e83"
+  }
+}

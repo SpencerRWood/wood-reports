@@ -123,6 +123,8 @@ def test_versioned_package_and_complete_provenance(source: Path) -> None:
     assert manifest["renderer"]["identity"] == "latex"
     assert manifest["wood_reports_version"]
     assert manifest["profile_version"] == "1.0.0"
+    assert manifest["profile"] == {"identity": "decision-memo", "revision": "1.0.0"}
+    assert manifest["brand"] == {"identity": "wood-analytics", "revision": "1.0.0"}
     assert manifest["theme"]["revision"]
     assert manifest["source"]["revision"] == "abc123"
     assert manifest["source"]["identity"] == "report.md"
@@ -136,6 +138,8 @@ def test_versioned_package_and_complete_provenance(source: Path) -> None:
     for name, digest in manifest["artifacts"].items():
         assert hashlib.sha256((directory / name).read_bytes()).hexdigest() == digest
     assert "source/workspace/generated/report.tex" in manifest["artifacts"]
+    assert "source/workspace/generated/components.tex" in manifest["artifacts"]
+    assert "source/workspace/generated/assets/brand.svg" in manifest["artifacts"]
     assert "source/report.json" in manifest["artifacts"]
     assert "compilation/compilation.json" in manifest["artifacts"]
     assert "validation.json" in manifest["artifacts"]

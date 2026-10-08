@@ -74,6 +74,21 @@ class LatexWorkspacePublisher:
             )
             source = staging / "report.tex"
             text = source.read_text(encoding="utf-8")
+            preamble_text, body_text = text.split(r"\begin{document}", 1)
+            document_class, components = preamble_text.split("\n", 1)
+            (staging / "components.tex").write_text(components, encoding="utf-8")
+            (staging / "assets").mkdir(exist_ok=True)
+            (staging / "assets" / "brand.svg").write_text(
+                report.theme.wordmark_svg, encoding="utf-8"
+            )
+            text = (
+                document_class
+                + "\n"
+                + r"\input{components.tex}"
+                + "\n"
+                + r"\begin{document}"
+                + body_text
+            )
             preamble = (
                 f"\\InputIfFileExists{{../{self._extensions_directory}/preamble.tex}}"
                 "{}{}"
@@ -110,6 +125,12 @@ class LatexWorkspacePublisher:
                 "profile": {
                     "identity": report.metadata.doc_type,
                     "version": report.metadata.profile_version,
+                },
+                "brand": {
+                    "identity": report.theme.brand_identity,
+                    "revision": report.theme.brand_revision,
+                    "asset": "assets/brand.svg",
+                    "font_policy": report.theme.branding.font_policy,
                 },
                 "document": document,
                 "theme": asdict(report.theme),

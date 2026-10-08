@@ -10,6 +10,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
+from wood_reports.branding import parse_logo, require_fonts
 from wood_reports.model import (
     ChartReference,
     Finding,
@@ -53,6 +54,15 @@ class _PowerPointDocument:
         self._primary = self._color(theme.colors.primary)
         self._muted = self._color(theme.colors.text_muted)
         self._content_width = self._slide_width - 2 * self._margin
+        branding = theme.branding
+        self._header_left = (
+            max(self._margin, Inches(branding.offset_x + branding.width + 0.2))
+            if branding.corner == "top-left" and branding.visible
+            else self._margin
+        )
+        self._header_width = self._slide_width - self._header_left - self._margin
+        if branding.corner == "top-right" and branding.visible:
+            self._header_width -= Inches(branding.width + 0.2)
 
     @staticmethod
     def _color(value: str) -> Any:
@@ -61,6 +71,10 @@ class _PowerPointDocument:
     def render(self, report: Report, destination: Path, *, artifact_root: Path) -> Path:
         """Write a valid PowerPoint file and return its destination."""
         report.validate(artifact_root)
+        if self.theme.branding.font_policy == "strict":
+            require_fonts(
+                (self.theme.typography.family, self.theme.typography.code_family)
+            )
         presentation = Presentation()
         presentation.slide_width = self._slide_width
         presentation.slide_height = self._slide_height
@@ -140,9 +154,9 @@ class _PowerPointDocument:
         self._add_text(
             slide,
             report.metadata.title,
-            self._margin,
+            self._header_left,
             Inches(0.55),
-            Inches(10),
+            self._header_width,
             Inches(0.3),
             10,
             color=self._muted,
@@ -281,7 +295,9 @@ class _PowerPointDocument:
         row_height = self._hint_inches(
             table.renderer_hints,
             "powerpoint.row_height",
-            self.theme.spacing.table_row_inches,
+            self.theme.spacing.table_row_inches
+            * self.theme.table_layout.row_inches
+            / self.theme.table_layout.comfortable_row_inches,
             element,
         )
         rows = len(table.rows) + 1
@@ -499,9 +515,9 @@ class _PowerPointDocument:
         self._add_text(
             slide,
             report.metadata.title,
-            self._margin,
+            self._header_left,
             Inches(0.35),
-            Inches(10),
+            self._header_width,
             Inches(0.3),
             10,
             color=self._muted,
@@ -542,30 +558,70 @@ class _PowerPointDocument:
     def _add_brand_footer(self, slide: Any, report: Report, page: int) -> None:
         slide.background.fill.solid()
         slide.background.fill.fore_color.rgb = self._color(self.theme.colors.background)
-        self._add_text(
-            slide,
-            self.theme.wordmark,
-            self._slide_width - Inches(2.8),
-            Inches(0.35),
-            Inches(2.2),
-            Inches(0.3),
-            11,
-            bold=True,
-        )
+        branding = self.theme.branding
+        if branding.cover_visible if page == 1 else branding.visible:
+            self._add_logo(slide)
         if report.metadata.confidentiality:
             self._add_text(
                 slide,
                 report.metadata.confidentiality,
-                self._slide_width - Inches(4.8),
+                self._margin
+                if branding.corner == "bottom-right"
+                else self._slide_width - Inches(4.8),
                 self._slide_height - Inches(0.5),
                 Inches(3.4),
                 Inches(0.25),
                 self.theme.typography.note,
                 color=self._muted,
-                alignment=PP_ALIGN.RIGHT,
+                alignment=PP_ALIGN.LEFT
+                if branding.corner == "bottom-right"
+                else PP_ALIGN.RIGHT,
             )
         if self.theme.page_numbers:
             self._add_page_number(slide, page)
+
+    def _add_logo(self, slide: Any) -> None:
+        branding = self.theme.branding
+        logo = parse_logo(self.theme.wordmark_svg)
+        scale = min(branding.width / logo.width, branding.height / logo.height)
+        x, y = branding.position(
+            self.theme.geometry.slide_width, self.theme.geometry.slide_height
+        )
+        for index, shape in enumerate(logo.shapes):
+            if shape.text:
+                point = shape.contours[0][0]
+                native = self._add_text(
+                    slide,
+                    shape.text,
+                    Inches(x + point.real * scale),
+                    Inches(y + (point.imag - shape.font_size) * scale),
+                    Inches((logo.width - point.real) * scale),
+                    Inches(branding.height),
+                    shape.font_size * scale * 72,
+                    color=self._color(shape.color),
+                    bold=shape.bold,
+                )
+                native.text_frame.margin_left = 0
+                native.text_frame.margin_top = 0
+                native.text_frame.margin_bottom = 0
+                native.text_frame.margin_right = 0
+            else:
+                first = shape.contours[0][0]
+                # Local coordinates retain precision independently of the EMU scale.
+                builder = slide.shapes.build_freeform(
+                    first.real * 1000, first.imag * 1000, scale=Inches(1) * scale / 1000
+                )
+                for contour in shape.contours:
+                    builder.move_to(contour[0].real * 1000, contour[0].imag * 1000)
+                    builder.add_line_segments(
+                        [(p.real * 1000, p.imag * 1000) for p in contour[1:]],
+                        close=True,
+                    )
+                native = builder.convert_to_shape(Inches(x), Inches(y))
+                native.fill.solid()
+                native.fill.fore_color.rgb = self._color(shape.color)
+                native.line.fill.background()
+            native.name = f"Wood brand {index}"
 
     @staticmethod
     def _format_cell(cell: object, format_spec: str | None, element: str) -> str:
@@ -582,7 +638,9 @@ class _PowerPointDocument:
         self._add_text(
             slide,
             str(page),
-            self._slide_width - Inches(1.2),
+            self._slide_width / 2 - Inches(0.25)
+            if self.theme.branding.corner == "bottom-right"
+            else self._slide_width - Inches(1.2),
             self._slide_height - Inches(0.5),
             Inches(0.5),
             Inches(0.2),

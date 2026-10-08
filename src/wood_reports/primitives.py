@@ -1,5 +1,6 @@
 """Shared Markdown interpretation used by both publication renderers."""
 
+import re
 from dataclasses import dataclass
 
 from markdown_it import MarkdownIt
@@ -86,12 +87,57 @@ def latex_escape(text: str) -> str:
     return "".join(replacements.get(character, character) for character in text)
 
 
+_TECHNICAL = re.compile(
+    r"https?://[^\s<>]+|[\w]+(?:[/_.][\w.-]+)+",
+    re.UNICODE,
+)
+
+
+def has_technical_text(text: str) -> bool:
+    """Identify semantic code, links, paths, keys and repository identifiers."""
+    return any(
+        run.code or run.hyperlink or _TECHNICAL.search(run.text)
+        for run in text_runs(text)
+    )
+
+
+def latex_identifier(text: str) -> str:
+    """Wrap literal segments without introducing discretionary visible hyphens."""
+    if not _TECHNICAL.search(text) and len(text) <= 16:
+        return latex_escape(text)
+    pieces = re.split(r"([/_.:-])", text)
+    return r"\allowbreak{}".join(
+        # Very long unbroken identifiers still need lossless break opportunities.
+        r"\penalty500{}".join(
+            r"\mbox{" + latex_escape(piece[start : start + 16]) + "}"
+            for start in range(0, len(piece), 16)
+        )
+        for piece in pieces
+        if piece
+    )
+
+
+def _technical_prose(text: str) -> str:
+    parts: list[str] = []
+    position = 0
+    for match in _TECHNICAL.finditer(text):
+        parts.extend(
+            [
+                latex_escape(text[position : match.start()]),
+                latex_identifier(match.group()),
+            ]
+        )
+        position = match.end()
+    parts.append(latex_escape(text[position:]))
+    return "".join(parts)
+
+
 def latex_inline(text: str) -> str:
     parts: list[str] = []
     for run in text_runs(text):
-        value = latex_escape(run.text)
+        value = _technical_prose(run.text)
         if run.code:
-            value = f"\\texttt{{{value}}}"
+            value = f"\\texttt{{{latex_identifier(run.text)}}}"
         if run.italic:
             value = f"\\emph{{{value}}}"
         if run.bold:

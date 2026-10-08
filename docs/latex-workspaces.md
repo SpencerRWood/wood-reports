@@ -5,13 +5,15 @@ workspace, artifact_root=chart_directory)`. The returned entrypoint remains
 `generated/report.tex`. The workspace is a reproducible source artifact; the
 compiled PDF is the client deliverable.
 
-The publisher writes generated source, copied chart assets, and
+The publisher writes generated source, shared `generated/components.tex`, the
+configured `generated/assets/brand.svg`, copied chart assets, and
 `generated/workspace.json`. This deterministic manifest records the workspace
 entrypoint, document/profile metadata, complete publication theme, ownership
 directories, SHA-256 source fingerprints, preferred engine, and build arguments.
 Chart dependencies use relative paths and safe filenames. No source artifact
 directory is needed after publication. The bundled Wood Analytics typography
-uses available font fallbacks; identical PDF bytes across different font or TeX
+uses the selected font policy (explicit fallback or strict availability checks);
+identical PDF bytes across different font or TeX
 installations are not promised.
 
 Run the manifest's build command from its `working_directory`, relative to the
