@@ -15,6 +15,7 @@ from wood_reports.profiles import get_profile
 from wood_reports.tex_diagnostics import (
     CompilerDiagnostic,
     DiagnosticContext,
+    diagnostic_log_text,
     parse_tex_diagnostics,
 )
 
@@ -175,7 +176,9 @@ def validate_pdf(  # noqa: PLR0912, PLR0915
         try:
             if log.is_symlink():
                 raise ValueError("compiler log cannot be a symlink")
-            text = log.read_text(encoding="utf-8", errors="replace")
+            text = diagnostic_log_text(
+                log.read_text(encoding="utf-8", errors="replace")
+            )
         except OSError, ValueError:
             issues.append(
                 ValidationIssue("log-missing", location, "compiler log cannot be read")

@@ -10,6 +10,7 @@ from wood_reports.api import (
     TargetStatus,
 )
 from wood_reports.branding import PublicationBranding
+from wood_reports.citations import BibliographySource
 from wood_reports.clsi import CLSICompiler
 from wood_reports.compilation import (
     CLSIConfig,
@@ -19,6 +20,7 @@ from wood_reports.compilation import (
     WorkspaceCompiler,
 )
 from wood_reports.compiler import ReportCompiler, SourceCompilationError
+from wood_reports.diagrams import ArchitectureDiagram
 from wood_reports.latex import LatexRenderer, LatexRenderError
 from wood_reports.latex_workspace import LatexWorkspaceError, LatexWorkspacePublisher
 from wood_reports.markdown import MarkdownReportCompiler
@@ -88,6 +90,8 @@ if TYPE_CHECKING:
 __all__ = [
     "WOOD_ANALYTICS_THEME",
     "Appendix",
+    "ArchitectureDiagram",
+    "BibliographySource",
     "CLSICompiler",
     "CLSIConfig",
     "CLSICredentials",

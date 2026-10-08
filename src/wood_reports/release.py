@@ -13,8 +13,13 @@ from importlib.metadata import version
 from pathlib import Path
 from tempfile import mkdtemp
 
+from wood_reports.citation_validation import (
+    validate_biber_processing,
+    validate_citation_navigation,
+)
 from wood_reports.clsi_workspace import read_workspace
 from wood_reports.compilation import CompilationResult, WorkspaceCompiler
+from wood_reports.diagrams import RENDERER_ID, RENDERER_VERSION, ArchitectureDiagram
 from wood_reports.latex_workspace import LatexWorkspacePublisher
 from wood_reports.model import Report
 from wood_reports.pdf_validation import (
@@ -83,6 +88,7 @@ def release_manifest(  # noqa: PLR0913
     compilation: CompilationResult,
     validation: PDFValidationResult,
     artifacts: Mapping[str, str],
+    biber_version: str | None = None,
 ) -> dict[str, object]:
     """Pure deterministic manifest construction for an exact artifact snapshot.
 
@@ -105,6 +111,27 @@ def release_manifest(  # noqa: PLR0913
             "identity": metadata.doc_type,
             "revision": metadata.profile_version,
         },
+        **(
+            {"diagrams": {"renderer": RENDERER_ID, "version": RENDERER_VERSION}}
+            if any(
+                isinstance(item, ArchitectureDiagram)
+                for section in report.content_sections
+                for item in section.content
+            )
+            else {}
+        ),
+        **(
+            {
+                "bibliography": {
+                    "backend": "biber",
+                    "version": biber_version,
+                    "entries": len(report.bibliography),
+                    "navigation": "validated",
+                }
+            }
+            if report.bibliography
+            else {}
+        ),
         "brand": {
             "identity": report.theme.brand_identity,
             "revision": report.theme.brand_revision,
@@ -223,6 +250,16 @@ class ReleasePublisher:
             canonical_json({"passed": validation.passed, **asdict(validation)})
         )
         validation.require_passed()
+        biber_version = None
+        if report.bibliography:
+            if compilation.pdf is None:
+                raise ValueError("bibliography validation requires a PDF")
+            citations = validate_citation_navigation(report, compilation.pdf)
+            biber_version = validate_biber_processing(compilation.logs)
+            (attempt / "citation-validation.json").write_bytes(
+                canonical_json({"passed": citations.passed, **asdict(citations)})
+            )
+            citations.require_passed()
         self._verify_compilation(compilation, fingerprints)
         if fingerprints != read_workspace(workspace, resource_urls or {}).fingerprints:
             raise ValueError("workspace changed during compilation")
@@ -247,6 +284,7 @@ class ReleasePublisher:
             compilation=compilation,
             validation=validation,
             artifacts=artifacts,
+            biber_version=biber_version,
         )
         (attempt / "release.json").write_bytes(canonical_json(manifest))
         if artifacts != self._checksums(attempt):

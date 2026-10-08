@@ -14,33 +14,12 @@ from pypdf import PdfReader
 
 from wood_reports import (
     CLSICompiler,
-    CLSIConfig,
-    CLSICredentials,
     CompilationError,
     LatexWorkspacePublisher,
     ReportCompiler,
     scaffold_markdown,
 )
 from wood_reports.cli import main
-
-
-@pytest.fixture
-def backend(request: pytest.FixtureRequest) -> CLSICompiler:
-    if not request.config.getoption("--run-clsi"):
-        pytest.skip("CLSI integration requires --run-clsi and injected credentials")
-    values = {
-        key: os.environ.get(key, "")
-        for key in ("WOOD_REPORTS_CLSI_USERNAME", "WOOD_REPORTS_CLSI_PASSWORD")
-    }
-    if not all(values.values()):
-        pytest.fail("Inject WOOD_REPORTS_CLSI_USERNAME and WOOD_REPORTS_CLSI_PASSWORD")
-    configured = CLSIConfig.from_pyproject(Path("pyproject.toml"))
-    return CLSICompiler(
-        CLSIConfig(configured.url, min(configured.timeout_seconds, 20)),
-        CLSICredentials(
-            values["WOOD_REPORTS_CLSI_USERNAME"], values["WOOD_REPORTS_CLSI_PASSWORD"]
-        ),
-    )
 
 
 def test_deployed_clsi_compiles_branded_markdown_and_retains_failure_logs(

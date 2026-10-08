@@ -43,7 +43,10 @@ def test_all_initial_profiles_compile_deterministically(
     assert first.metadata.doc_type == doc_type
     assert first.metadata.doc_name == "internal-example"
     assert first.metadata.profile_version == "1.0.0"
-    assert first.sections[0].semantic == "executive-summary"
+    assert (
+        first.sections[0].semantic
+        == get_profile(doc_type).required_section_variants[0][0]
+    )
 
 
 def test_compiles_the_approved_lighter_analytics_variant() -> None:

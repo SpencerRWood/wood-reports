@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from wood_reports.citations import BibliographySource, citation_inline, deduplicate
+from wood_reports.diagrams import ArchitectureDiagram, parse_flowchart
 from wood_reports.theme import WOOD_ANALYTICS_THEME, PublicationTheme
 
 type Alignment = Literal["left", "center", "right"]
@@ -143,7 +145,7 @@ class PublicationTable:
                 )
 
 
-type ReportContent = Narrative | ChartReference | PublicationTable
+type ReportContent = Narrative | ChartReference | PublicationTable | ArchitectureDiagram
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,11 +220,26 @@ class Report:
     appendices: tuple[Appendix, ...] = ()
     renderer_hints: RendererHints = field(default_factory=dict)
     theme: PublicationTheme = WOOD_ANALYTICS_THEME
+    bibliography: tuple[BibliographySource, ...] = ()
+
+    @property
+    def content_sections(self) -> tuple[Section | Appendix, ...]:
+        return (*self.sections, *self.appendices)
 
     def validate(self, artifact_root: Path) -> None:
         """Reject incomplete report structure or missing local artifacts."""
         self.metadata.validate()
         self.theme.validate()
+        try:
+            if deduplicate(self.bibliography) != self.bibliography:
+                raise ValueError("bibliography must be deduplicated before rendering")
+        except ValueError as error:
+            raise ReportValidationError("bibliography", str(error)) from error
+        for text in self.citation_texts():
+            try:
+                citation_inline(text, self.bibliography)
+            except ValueError as error:
+                raise ReportValidationError("citations", str(error)) from error
         if not self.sections:
             raise ReportValidationError("sections", "must contain a section")
         for index, section in enumerate(self.sections):
@@ -231,6 +248,39 @@ class Report:
             finding.validate(f"findings[{index}]", artifact_root)
         for index, appendix in enumerate(self.appendices):
             appendix.validate(f"appendices[{index}]", artifact_root)
+
+    def citation_texts(self) -> tuple[str, ...]:
+        """Authored citation occurrences, excluding literal code and metadata."""
+        texts: list[str] = []
+        content = [
+            item for section in self.content_sections for item in section.content
+        ]
+        content.extend(finding.narrative for finding in self.findings)
+        content.extend(
+            finding.visual for finding in self.findings if finding.visual is not None
+        )
+        for item in content:
+            if isinstance(item, Narrative) and item.kind != "code":
+                texts.append(item.text)
+            elif isinstance(item, PublicationTable):
+                texts.extend(
+                    value
+                    for row in item.rows
+                    for value in row
+                    if isinstance(value, str)
+                )
+                texts.extend(item.notes)
+                if item.caption:
+                    texts.append(item.caption)
+            elif isinstance(item, ChartReference) and item.caption:
+                texts.append(item.caption)
+            elif isinstance(item, ArchitectureDiagram):
+                graph = parse_flowchart(item.source)
+                texts.extend(node.label for node in graph.nodes)
+                texts.extend(edge.label for edge in graph.edges)
+                texts.extend(graph.legends)
+                texts.append(item.caption)
+        return tuple(texts)
 
 
 def resolve_chart_artifact(chart: ChartReference, artifact_root: Path) -> Path:

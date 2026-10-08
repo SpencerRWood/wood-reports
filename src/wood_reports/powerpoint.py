@@ -71,6 +71,8 @@ class _PowerPointDocument:
     def render(self, report: Report, destination: Path, *, artifact_root: Path) -> Path:
         """Write a valid PowerPoint file and return its destination."""
         report.validate(artifact_root)
+        if report.bibliography:
+            raise ValueError("biblatex bibliography requires the LaTeX renderer")
         if self.theme.branding.font_policy == "strict":
             require_fonts(
                 (self.theme.typography.family, self.theme.typography.code_family)
@@ -188,8 +190,10 @@ class _PowerPointDocument:
                 )
             elif isinstance(content, PublicationTable):
                 self._add_table_slide(presentation, report, section, content, element)
-            else:
+            elif isinstance(content, Narrative):
                 self._add_narrative_slide(presentation, report, section, content)
+            else:
+                raise ValueError("architecture diagrams require the LaTeX renderer")
 
     def _add_chart_slide(  # noqa: PLR0913, PLR0917
         self,

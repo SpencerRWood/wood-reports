@@ -5,7 +5,7 @@ from wood_reports.model import Report
 from wood_reports.primitives import latex_escape
 
 
-def latex_preamble(report: Report) -> list[str]:
+def latex_preamble(report: Report, *, mixed_orientation: bool = False) -> list[str]:
     theme = report.theme
     geometry = theme.geometry
     typography = theme.typography
@@ -132,7 +132,7 @@ def latex_preamble(report: Report) -> list[str]:
         ]
     )
     parts.extend(font_validation(report))
-    parts.extend(brand_components(report))
+    parts.extend(brand_components(report, mixed_orientation=mixed_orientation))
     return parts
 
 
@@ -157,7 +157,7 @@ def font_validation(report: Report) -> list[str]:
     return lines
 
 
-def brand_components(report: Report) -> list[str]:
+def brand_components(report: Report, *, mixed_orientation: bool = False) -> list[str]:
     theme = report.theme
     branding = theme.branding
     logo = parse_logo(theme.wordmark_svg)
@@ -195,11 +195,67 @@ def brand_components(report: Report) -> list[str]:
         f"([xshift={x}in,yshift=-{y}in]current page.north west)"
         r"{\WoodBrandLogo};\end{tikzpicture}"
     )
-    lines.append(
-        r"\AddToShipoutPictureFG{\ifnum\value{page}=1 "
+    portrait = (
+        r"\ifnum\value{page}=1 "
         + (overlay if branding.cover_visible else "")
         + r"\else "
         + (overlay if branding.visible else "")
-        + r"\fi}"
+        + r"\fi"
     )
+    if mixed_orientation:
+        lines.append(r"\newif\ifWoodLandscapePage")
+        landscape_logo, landscape_footer = _landscape_overlays(report)
+        landscape = (
+            landscape_footer
+            + r"\ifnum\value{page}=1 "
+            + (landscape_logo if branding.cover_visible else "")
+            + r"\else "
+            + (landscape_logo if branding.visible else "")
+            + r"\fi"
+        )
+        lines.append(
+            r"\AddToShipoutPictureFG{\ifWoodLandscapePage "
+            + landscape
+            + r"\else "
+            + portrait
+            + r"\fi}"
+        )
+    else:
+        lines.append(r"\AddToShipoutPictureFG{" + portrait + "}")
     return lines
+
+
+def _landscape_overlays(report: Report) -> tuple[str, str]:
+    """Reuse the shared logo and footer policy in rotated PDF coordinates."""
+    theme = report.theme
+    geometry = theme.geometry
+    width, height = geometry.page_height, geometry.page_width
+
+    def node(content: str, x: float, y: float, anchor: str) -> str:
+        return (
+            r"\begin{tikzpicture}[remember picture,overlay]"
+            f"\\node[anchor={anchor},rotate=90,inner sep=0pt] at "
+            f"([xshift={y}in,yshift={x - geometry.page_height}in]"
+            "current page.north west) {" + content + r"};\end{tikzpicture}"
+        )
+
+    x, y = theme.branding.position(width, height)
+    logo = node(r"\WoodBrandLogo", x, y, "north west")
+    footer_y = height - geometry.page_margin / 2
+    centered_confidentiality = theme.branding.corner == "bottom-left"
+    footer = node(
+        r"\small\color{Woodtext_muted} "
+        + latex_escape(report.metadata.confidentiality or ""),
+        width / 2 if centered_confidentiality else geometry.page_margin,
+        footer_y,
+        "south" if centered_confidentiality else "south west",
+    )
+    if theme.page_numbers:
+        centered_page = theme.branding.corner == "bottom-right"
+        footer += node(
+            r"\small\thepage",
+            width / 2 if centered_page else width - geometry.page_margin,
+            footer_y,
+            "south" if centered_page else "south east",
+        )
+    return logo, footer

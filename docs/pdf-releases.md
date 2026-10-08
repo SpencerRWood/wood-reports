@@ -24,6 +24,11 @@ provide retained logs. Undefined references/citations, missing files/glyphs,
 fatal errors, and overfull horizontal/vertical boxes greater than **5 points**
 block release. Cosmetic underfull boxes and smaller overfull boxes are allowed.
 
+Reports with bibliography metadata also require clean retained biber evidence,
+every citation occurrence's PDF destination and bibliography link, all source
+URLs, and accurate citing-page back-references. `citation-validation.json`
+records those gates; release metadata records the observed biber version.
+
 `validate_pdf(CompilationResult)` is also a standalone Python API. It returns
 sorted, deterministic `ValidationIssue` records, page count, and a SHA-256 digest;
 `require_passed()` raises `PDFValidationError`. It requires a nonencrypted PDF

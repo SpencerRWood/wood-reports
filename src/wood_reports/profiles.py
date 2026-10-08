@@ -35,6 +35,7 @@ class DocumentProfile:
     required_section_variants: tuple[tuple[str, ...], ...]
     permitted_content: tuple[str, ...]
     callouts: tuple[str, ...]
+    authored_sections: bool = False
 
     def validate_schema(self) -> None:  # noqa: PLR0912
         """Reject malformed contracts before authoring or instance validation."""
@@ -76,6 +77,7 @@ class DocumentProfile:
             "callout",
             "heading",
             "code",
+            "diagram",
         }:
             raise ProfileValidationError(
                 "profile.permitted_content: unsupported content"
@@ -116,6 +118,10 @@ class DocumentProfile:
                 semantic_id(value) for value in (section.title, *section.aliases)
             }:
                 return section
+        if self.authored_sections and semantic_id(heading):
+            return ProfileSection(
+                semantic_id(heading), heading, "Source-owned architecture section."
+            )
         raise ProfileValidationError(
             f"sections.{heading}: unrecognized profile heading"
         )
@@ -137,7 +143,13 @@ class DocumentProfile:
             raise ProfileValidationError(
                 "frontmatter.doc_name: requires a lowercase slug"
             )
-        if len(set(sections)) != len(sections):
+        duplicate_sections = {
+            identity for identity in sections if sections.count(identity) > 1
+        }
+        defined_sections = {section.identity for section in self.sections}
+        if duplicate_sections and (
+            not self.authored_sections or duplicate_sections & defined_sections
+        ):
             raise ProfileValidationError("sections: duplicate semantic section")
         if not any(
             set(variant) <= set(sections) for variant in self.required_section_variants
@@ -201,6 +213,46 @@ def _profile(
 
 
 _PROFILES = (
+    DocumentProfile(
+        identity="technical-architecture",
+        display_name="Technical Architecture",
+        purpose=(
+            "Preserve canonical architecture facts, diagrams and evidence "
+            "in a technical publication."
+        ),
+        version="1.0.0",
+        required_metadata=("doc_type", "doc_name", "title"),
+        optional_metadata=(*_METADATA, "toc", "page_layout"),
+        sections=tuple(
+            _section(title, guidance)
+            for title, guidance in (
+                (
+                    "Summary",
+                    "Describe the authored architecture scope "
+                    "and evidence limitations.",
+                ),
+                ("Architecture Context", "Present system context and boundaries."),
+                ("Components", "Present authored components and technical inventory."),
+                ("Dependencies", "Present typed directed dependency relationships."),
+                ("Orchestration", "Present authored orchestration relationships."),
+                (
+                    "Deployment",
+                    "Present declared deployment topology "
+                    "without attesting runtime health.",
+                ),
+                (
+                    "Source provenance",
+                    "Preserve source identities, revisions, "
+                    "evidence state and limitations.",
+                ),
+                ("Appendix", "Provide authored technical appendices."),
+            )
+        ),
+        required_section_variants=(("summary", "source-provenance"),),
+        permitted_content=(*_CONTENT, "diagram"),
+        callouts=_CALLOUTS,
+        authored_sections=True,
+    ),
     _profile(
         "project-brief",
         "Align an engagement's objectives, scope, and delivery expectations.",

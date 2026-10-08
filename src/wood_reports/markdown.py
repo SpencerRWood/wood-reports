@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import yaml
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from wood_reports.citations import deduplicate, footnote_sources, structured_sources
 from wood_reports.compiler import ReportCompiler, SourceCompilationError, TemplateValues
+from wood_reports.diagrams import ArchitectureDiagram
 from wood_reports.model import (
     Appendix,
     ChartReference,
@@ -25,7 +28,7 @@ from wood_reports.model import (
 from wood_reports.profiles import DocumentProfile, ProfileValidationError, get_profile
 
 
-def _frontmatter(text: str, source: Path) -> tuple[dict[str, str], str]:
+def _frontmatter(text: str, source: Path) -> tuple[dict[str, object], str]:
     lines = text.removeprefix("\ufeff").replace("\r\n", "\n").splitlines()
     if not lines or lines[0] != "---":
         raise SourceCompilationError(source, "frontmatter", "must begin with ---")
@@ -52,7 +55,8 @@ def _frontmatter(text: str, source: Path) -> tuple[dict[str, str], str]:
     except yaml.YAMLError as error:
         raise SourceCompilationError(source, "frontmatter", str(error)) from error
     if not isinstance(values, dict) or not all(
-        isinstance(key, str) and isinstance(value, str) for key, value in values.items()
+        isinstance(key, str) and (isinstance(value, str) or key == "references")
+        for key, value in values.items()
     ):
         raise SourceCompilationError(
             source,
@@ -78,14 +82,23 @@ class MarkdownReportCompiler:
         doc_type: str | None = None,
         doc_name: str | None = None,
     ) -> Report:
-        metadata, body = _frontmatter(text, source)
+        raw_metadata, body = _frontmatter(text, source)
+        try:
+            structured = structured_sources(raw_metadata.pop("references", None))
+            body, footnotes = footnote_sources(body)
+            bibliography = deduplicate((*structured, *footnotes))
+        except ValueError as error:
+            raise SourceCompilationError(source, "references", str(error)) from error
+        metadata = {key: str(value) for key, value in raw_metadata.items()}
         if doc_type is not None:
             metadata["doc_type"] = doc_type
         if doc_name is not None:
             metadata["doc_name"] = doc_name
         try:
             profile = get_profile(metadata.get("doc_type", ""))
-            sections, appendices, semantics = self._sections(body, source, profile)
+            sections, appendices, semantics = self._sections(
+                body, source, profile, has_bibliography=bool(bibliography)
+            )
             profile.validate_instance(metadata, semantics)
         except ProfileValidationError as error:
             raise SourceCompilationError(source, "profile", str(error)) from error
@@ -93,6 +106,14 @@ class MarkdownReportCompiler:
             name: self._render(value, source, f"frontmatter.{name}")
             for name, value in metadata.items()
         }
+        for name, allowed in (
+            ("toc", {"true", "false"}),
+            ("page_layout", {"portrait", "landscape"}),
+        ):
+            if name in fields and fields[name] not in allowed:
+                raise SourceCompilationError(
+                    source, f"frontmatter.{name}", f"requires one of {sorted(allowed)}"
+                )
         report = Report(
             ReportMetadata(
                 title=fields["title"],
@@ -113,6 +134,12 @@ class MarkdownReportCompiler:
             ),
             tuple(sections),
             appendices=tuple(appendices),
+            bibliography=bibliography,
+            renderer_hints={
+                f"latex.{name}": fields[name]
+                for name in ("toc", "page_layout")
+                if name in fields
+            },
         )
         try:
             report.validate(artifact_root or source.parent)
@@ -135,11 +162,18 @@ class MarkdownReportCompiler:
     def _render(self, text: str, source: Path, field: str) -> str:
         return self._text_compiler._render_text(text, source, field)
 
+    @staticmethod
+    def _heading(text: str) -> tuple[str, dict[str, str]]:
+        match = re.fullmatch(r"(.+?)\s+\{#([A-Za-z][A-Za-z0-9:_.-]*)\}", text)
+        return (match[1], {"latex.label": match[2]}) if match else (text, {})
+
     def _sections(
         self,
         body: str,
         source: Path,
         profile: DocumentProfile,
+        *,
+        has_bibliography: bool = False,
     ) -> tuple[list[Section], list[Appendix], tuple[str, ...]]:
         tokens = self._parser.parse(body)
         sections: list[Section] = []
@@ -148,11 +182,29 @@ class MarkdownReportCompiler:
         index = 0
         while index < len(tokens):
             token = tokens[index]
+            if (
+                profile.identity == "technical-architecture"
+                and token.type != "heading_open"
+                and not sections
+            ):
+                start = index
+                while index < len(tokens) and tokens[index].type != "heading_open":
+                    index += 1
+                sections.append(
+                    Section(
+                        "Document state",
+                        self._content(
+                            tokens[start:index], source, profile, body.splitlines()
+                        ),
+                        semantic="document-state",
+                    )
+                )
+                continue
             if token.type != "heading_open" or token.tag not in {"h1", "h2"}:
                 raise SourceCompilationError(
                     source, "body", "content must follow a profile section heading (##)"
                 )
-            heading = tokens[index + 1].content
+            heading, hints = self._heading(tokens[index + 1].content)
             if token.tag == "h1":
                 if index != 0:
                     raise SourceCompilationError(
@@ -173,14 +225,36 @@ class MarkdownReportCompiler:
             content = self._content(
                 tokens[start:index], source, profile, body.splitlines()
             )
+            content = tuple(
+                replace(item, caption=heading)
+                if isinstance(item, ArchitectureDiagram)
+                else item
+                for item in content
+            )
+            if (
+                not content
+                and rule.identity == "source-provenance"
+                and has_bibliography
+            ):
+                content = (
+                    Narrative(
+                        "Source identities, evidence states and provenance limitations "
+                        "are retained in the bibliography.",
+                        semantic="bibliography",
+                    ),
+                )
             if not content:
                 raise SourceCompilationError(
                     source, f"sections.{rule.identity}", "must contain authored content"
                 )
             if rule.identity == "appendix":
-                appendices.append(Appendix(heading, content))
+                appendices.append(Appendix(heading, content, renderer_hints=hints))
             else:
-                sections.append(Section(heading, content, semantic=rule.identity))
+                sections.append(
+                    Section(
+                        heading, content, renderer_hints=hints, semantic=rule.identity
+                    )
+                )
         return sections, appendices, tuple(semantics)
 
     def _content(  # noqa: PLR0912, PLR0915
@@ -222,6 +296,16 @@ class MarkdownReportCompiler:
                 item = self._table(tokens[index + 1 : end], source, field)
                 kind = "table"
                 index = end + 1
+                if (
+                    index + 2 < len(tokens)
+                    and tokens[index].type == "paragraph_open"
+                    and tokens[index + 1].content.startswith("Table: ")
+                ):
+                    caption, hints = self._heading(
+                        tokens[index + 1].content.removeprefix("Table: ")
+                    )
+                    item = replace(item, caption=caption, renderer_hints=hints)
+                    index += 3
             elif token.type in {"bullet_list_open", "ordered_list_open"}:
                 end = self._closing(tokens, index, token.type.replace("open", "close"))
                 self._require_prose_inlines(tokens[index:end], source, field)
@@ -271,18 +355,43 @@ class MarkdownReportCompiler:
                 kind = "callout"
                 index = end + 1
             elif token.type == "heading_open":
+                heading, hints = self._heading(tokens[index + 1].content)
                 item = Narrative(
-                    self._render(tokens[index + 1].content, source, field),
+                    self._render(heading, source, field),
                     kind="heading",
                     semantic=token.tag,
+                    renderer_hints=hints,
                 )
                 kind = "heading"
                 index += 3
             elif token.type in {"fence", "code_block"}:
-                item = Narrative(
-                    token.content.rstrip(), kind="code", semantic=token.info or None
+                diagram_attributes = re.fullmatch(
+                    r"\{\.mermaid(?:\s+#([A-Za-z][A-Za-z0-9:_.-]*))?\}", token.info
                 )
-                kind = "code"
+                if token.info == "mermaid" or diagram_attributes:
+                    if "diagram" not in profile.permitted_content:
+                        raise SourceCompilationError(
+                            source, field, "profile forbids diagram"
+                        )
+                    item = ArchitectureDiagram(
+                        token.content.rstrip(),
+                        "Source-owned architecture relationships",
+                        renderer_hints={"latex.label": diagram_attributes[1]}
+                        if diagram_attributes and diagram_attributes[1]
+                        else {},
+                    )
+                    try:
+                        item.validate(field)
+                    except ValueError as error:
+                        raise SourceCompilationError(
+                            source, field, str(error)
+                        ) from error
+                    kind = "diagram"
+                else:
+                    item = Narrative(
+                        token.content.rstrip(), kind="code", semantic=token.info or None
+                    )
+                    kind = "code"
                 index += 1
             else:
                 raise SourceCompilationError(
