@@ -30,6 +30,7 @@ def test_project_metadata_describes_wood_reports() -> None:
         "markdown-it-py>=4.0,<5",
         "pypdf>=6,<7",
         "pyyaml>=6.0",
+        "svg.path>=7,<8",
     ]
     assert project["optional-dependencies"]["powerpoint"] == ["python-pptx>=1.0"]
 

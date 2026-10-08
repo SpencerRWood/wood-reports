@@ -12,6 +12,11 @@ from pypdf import PdfReader
 from wood_reports.compilation import CompilationResult
 from wood_reports.model import Report
 from wood_reports.profiles import get_profile
+from wood_reports.tex_diagnostics import (
+    CompilerDiagnostic,
+    DiagnosticContext,
+    parse_tex_diagnostics,
+)
 
 _PLACEHOLDER = re.compile(r"\b(?:TODO|TBD|FIXME|PLACEHOLDER)\b|\{\{.+?\}\}", re.I)
 _LOCAL_PATH = re.compile(r"/(?:Users|home|private|tmp)/|(?<![A-Za-z])[A-Za-z]:[\\/]")
@@ -36,10 +41,17 @@ class PDFValidationResult:
     issues: tuple[ValidationIssue, ...]
     pdf_sha256: str | None = None
     pages: int = 0
+    compiler_diagnostics: tuple[CompilerDiagnostic, ...] = ()
+    compilation_succeeded: bool | None = None
+    visual_acceptance: str = "not-assessed"
 
     @property
     def passed(self) -> bool:
         return not self.issues
+
+    @property
+    def structural_validation_passed(self) -> bool:
+        return self.passed
 
     def require_passed(self) -> None:
         if not self.passed:
@@ -116,8 +128,11 @@ def validate_release_report(
     return PDFValidationResult(tuple(sorted(set(issues))))
 
 
-def validate_pdf(  # noqa: PLR0912
-    compilation: CompilationResult, *, overfull_limit_pt: float = 5.0
+def validate_pdf(  # noqa: PLR0912, PLR0915
+    compilation: CompilationResult,
+    *,
+    overfull_limit_pt: float = 5.0,
+    underfull_badness: int = 1000,
 ) -> PDFValidationResult:
     """Check compile evidence, TeX diagnostics, and the complete PDF structure.
 
@@ -127,7 +142,19 @@ def validate_pdf(  # noqa: PLR0912
     if not 0 <= overfull_limit_pt <= 100:
         raise ValueError("overfull_limit_pt must be between 0 and 100")
     issues: list[ValidationIssue] = []
+    diagnostics: list[CompilerDiagnostic] = []
+    # stdout usually repeats the TeX log; classify the .log authority once.
+    parse_tex_diagnostics("", underfull_badness=underfull_badness)
     if compilation.status != "success" or compilation.compiler_status != "success":
+        diagnostics.append(
+            CompilerDiagnostic(
+                "compilation-failure",
+                "error",
+                1,
+                "compilation",
+                (DiagnosticContext(0, "compiler did not succeed"),),
+            )
+        )
         issues.append(
             ValidationIssue("compile-failed", "compilation", "compiler did not succeed")
         )
@@ -154,6 +181,20 @@ def validate_pdf(  # noqa: PLR0912
                 ValidationIssue("log-missing", location, "compiler log cannot be read")
             )
             continue
+        if log.suffix == ".log":
+            extracted = parse_tex_diagnostics(
+                text, log=location, underfull_badness=underfull_badness
+            )
+            diagnostics.extend(extracted)
+            for diagnostic in extracted:
+                if diagnostic.severity == "error":
+                    issues.append(
+                        ValidationIssue(
+                            diagnostic.category,
+                            location,
+                            diagnostic.contexts[0].message,
+                        )
+                    )
         if _LOG_FAILURE.search(text):
             issues.append(
                 ValidationIssue(
@@ -218,4 +259,10 @@ def validate_pdf(  # noqa: PLR0912
                 "PDF is missing, malformed, encrypted, truncated, or empty",
             )
         )
-    return PDFValidationResult(tuple(sorted(set(issues))), digest, pages)
+    return PDFValidationResult(
+        tuple(sorted(set(issues))),
+        digest,
+        pages,
+        tuple(diagnostics),
+        compilation.status == "success" and compilation.compiler_status == "success",
+    )

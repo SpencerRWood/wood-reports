@@ -1,7 +1,70 @@
 # Wood Analytics publication design system
 
+## Shared publication layout
+
+Every installed document profile uses the same table policy, configured under
+`[tool.wood_reports.publication.table_layout]`:
+
+```toml
+[tool.wood_reports.publication.table_layout]
+density = "comfortable" # or "compact"
+comfortable_row_inches = 0.28
+compact_row_inches = 0.22
+minimum_first_rows = 3
+minimum_last_rows = 2
+keep_together_rows = 6
+```
+
+Density changes row spacing, never font size. LaTeX measures the actual header
+and body group, then uses `Needspace` for that height plus caption/outer
+spacing. Short longtables reserve their complete body. Standard starred row
+endings protect the first three and final two rows; interior rows remain
+breakable. Headers repeat through `endhead`. Tables exceeding the threshold
+use longtable automatically unless a layout or width hint is explicitly selected.
+Explicit longtable with a width hint remains unsupported. Existing
+short table floats remain whole. Captions, alignment, rules, notes and source
+references retain their existing semantics. If the measured group exceeds a
+page, grouping relaxes with a visible compiler warning.
+
+Row stretch is local to shared table groups; it does not affect the title's
+author block. The existing `spacing.table_row_inches` is the comfortable
+slide height; compact density scales it by the compact/comfortable ratio.
+Page row heights use the policy above, bounded below by the existing font baseline.
+
+The regression's infinite glue-shrinkage messages originated in longtable's
+page-output routine, not paragraph skip or table content. Its infinitely
+shrinkable `vss` entered a box later split by LaTeX. Shared longtable setup
+gives that glue finite shrink of one normal baseline while retaining its stretch,
+scoped to the table. This applies the
+[LaTeX project's finite-shrink correction](https://www.latex-project.org/news/latex2e-news/ltnews43.pdf)
+without changing warning settings or replacing the output routine.
+
+Shared inline primitives preserve technical tokens with invisible breaks at
+identifier separators, and penalized breaks in long uninterrupted segments.
+Prose stays IBM Plex Sans; semantic code stays IBM Plex Mono; hyperlink targets
+are untouched. Technical narrative uses localized ragged-right layout; ordinary
+narrative remains justified. Ordinary hyphenated words alone do not select
+technical layout; semantic code, links and structured identifiers do.
+No discretionary visible hyphens are inserted.
+
+The PDF gate exposes grouped diagnostics with category, severity, count, log
+location, available source lines, and badness/overflow magnitude. Compiler success,
+structural gate status and visual acceptance are separate; visual acceptance
+defaults to `not-assessed`. Infinite shrink, missing assets/fonts/glyphs,
+undefined commands and structural failures block publication even when compilation
+succeeds. Underfull badness at least 1000 and all overfull boxes remain visible.
+The existing >5pt overflow and unresolved-reference/citation release gates remain.
+The retained TeX `.log` is authoritative; duplicated stdout does not inflate counts.
+Artifact fingerprints, PDF hashes and immutable release integrity are unchanged.
+
+Pagination targets apply when groups fit. Existing single-line column semantics
+remain; unusually tall captions and overflowing columns need authoring/configuration
+review. Material overflow is reported rather than shrinking or deleting content.
+Pixel checks also compile LuaLaTeX and assert real PDF structure for two profiles,
+both densities, boundary tables, repeated headers, fragments, extraction and links.
+
 Every report uses the immutable `WOOD_ANALYTICS_THEME` through `Report.theme`.
-The initial theme identity is `wood-analytics`, theme revision `1.0.0`, and brand
+The theme identity is `wood-analytics`, shared layout revision `1.1.0`, and brand
 revision `1.0.0`. YAML and profile-compliant Markdown compile to the same default.
 The theme has no runtime dependency on wood-charts. A contract test compares its
 shared tokens with the pinned wood-charts development dependency.
@@ -15,8 +78,8 @@ shared tokens with the pinned wood-charts development dependency.
 | Semantic accents | Primary for conclusions, summaries, recommendations, decisions, metrics, and notes; amber for risk/warning; red for critical findings; visible text labels accompany color |
 | Geometry | 13.333 × 7.5 inch slides, 0.65 inch margins; 8.5 × 11 inch pages, 0.8 inch margins |
 | Spacing | Paragraph separation, table row height, and figure width fraction |
-| Branding | Bundled vector wordmark in `assets/wordmark.svg`; editable text wordmark in native outputs |
-| Headers and footers | Wordmark and report title on standard slides; wordmark in page headers; page numbering and supplied confidentiality in footers |
+| Branding | One `PublicationBranding` contract; bundled placeholder or replacement SVG rendered as vectors and editable text |
+| Headers and footers | Configurable logo corner; report title on standard slides; page numbering and supplied confidentiality in footers; bottom-corner logos move conflicting footer content |
 | Tables | Native tables, primary header with white text, shared body typography, column alignment/format, captions and muted notes |
 | Figures | Locally materialized chart assets, captions and figure labels; original chart-intrinsic appearance retained |
 
@@ -54,14 +117,87 @@ Plex Sans/Mono if installed, then Arial for sans text if available, and bundled
 TeX Latin Modern font files otherwise; pdfLaTeX uses Helvetica.
 These fallbacks preserve the semantic design but can change line wrapping.
 
-Python consumers may create a new frozen theme using `dataclasses.replace` and
-attach it to a report. Assign a new theme/brand revision whenever changing tokens
-or branding. The bundled SVG represents the default brand; a custom brand must
-supply its own external vector asset. Renderers use the theme's native text
-wordmark. Invalid colors, sizes, and geometry fail before writing outputs.
+Python consumers may create a frozen theme using `dataclasses.replace` and attach
+it to a report, or pass it to `PublicationAPI(theme=theme)`. Assign a new theme
+revision when changing layout tokens, and independently update `brand_identity`
+and `brand_revision` when changing brand assets. Profile identities and revisions
+remain owned by document profiles. All four installed profiles consume this same
+contract; future architecture semantics remain profile-owned.
 
-Generation manifests record `theme.identity`, `theme.revision`, and
-`theme.brand_revision` from the materialized report. PowerPoint core properties
-also carry these revisions. Font availability is a machine prerequisite, not an
-assertion made by a manifest. Portable workspace orchestration remains owned by
-the following branded LaTeX workspace story.
+`PublicationBranding.from_svg(Path("logo.svg"))` snapshots a replacement asset.
+It can be modified with `replace(branding, corner="bottom-left")`. Size and offsets
+are inches, measured inward from the selected page/slide corner. The logo fits the
+configured width/height while preserving its aspect ratio. `visible` controls body
+pages/slides; `cover_visible` independently controls the first page/title slide.
+Defaults are top-right, 2.2 × 0.35 inches, with offsets 0.6 × 0.35 inches; both
+visibility options default to true. Full-frame chart slides retain their explicit
+chrome-free behavior.
+
+The portable SVG subset supports a zero-origin positive `viewBox`, six-digit hex
+fills, filled rectangles, plain IBM Plex Sans text, and paths with lines, curves,
+arcs and multiple contours under the nonzero fill rule. Curve segments use 64
+deterministic samples in both targets. PowerPoint uses native editable freeforms;
+LaTeX uses shared TikZ components without shell execution or binary resource URLs.
+Outline other fonts and flatten transforms before importing. Gradients, strokes,
+CSS, external resources, scripts, XML declarations, and unsupported elements or
+attributes fail with actionable diagnostics. Assets are bounded to 256000 bytes,
+128 elements and 32000 sampled points. Missing or malformed files fail before
+publication; output workspaces no longer depend on the original SVG path.
+
+`font_policy="fallback"` preserves the supported LaTeX fallbacks and reports missing
+Plex fonts as compiler warnings. PowerPoint continues to declare font names without
+embedding them. `font_policy="strict"` requires exact Sans/Mono fonts: LaTeX checks
+on the compiler host and fails when unavailable; PowerPoint checks the rendering
+host through fontconfig (`fc-match`). Strict LaTeX requires LuaLaTeX or XeLaTeX.
+
+Generation, workspace and release manifests record independent `brand` and
+`profile` identities/revisions, alongside the existing theme fields. Workspaces
+also record the configured font policy and fingerprint the portable SVG and shared
+`components.tex`. PowerPoint core properties carry theme/brand revisions.
+Requested font names in a manifest do not attest to actual installed fonts.
+
+## Central CLI configuration
+
+`wood-report preview` and `build` read the publication table from their selected
+`--config` file, which defaults to `pyproject.toml`. `PublicationTheme.from_pyproject`
+uses the same supported interface for Python consumers. An absent publication table
+uses supported defaults; unknown fields fail. There is no search for older files,
+environment branding overrides, or profile-local branding configuration.
+
+```toml
+[tool.wood_reports.publication]
+brand_identity = "internal-brand"
+brand_revision = "2.0.0"
+wordmark = "Internal Brand"
+
+[tool.wood_reports.publication.branding]
+svg_path = "assets/logo.svg" # Relative to this config file; snapshotted at load.
+corner = "bottom-left"
+width = 2.2
+height = 0.35
+offset_x = 0.6
+offset_y = 0.35
+visible = true
+cover_visible = false
+font_policy = "strict"
+
+[tool.wood_reports.publication.typography]
+caption = 11
+```
+
+The optional colors, typography, geometry and spacing tables use the existing
+dataclass token names. Omit `svg_path` to use the placeholder with the configured
+wordmark/primary color. Inline `logo_svg` is also supported; supplying both asset
+forms is an error.
+
+## Visual evidence
+
+Cross-profile unit tests inspect both native outputs, configuration errors,
+visibility, placement and independent manifest revisions. Pixel regression tests
+use the exact LuaHBTeX, PyMuPDF and font-file hashes in
+`tests/fixtures/publication-visual/environment.json`; mismatches fail explicitly.
+Run `uv run pytest tests/integration/test_publication_visual.py
+--run-publication-visual` on that environment. The checked-in cover/body PNGs cover
+all four profiles, all corners, and placeholder/replacement SVGs. Updating a
+baseline requires the additional explicit `--update-publication-visual` option and
+visual review. Regular tests skip these opt-in checks rather than claim them passed.

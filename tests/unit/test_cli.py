@@ -249,6 +249,39 @@ def test_cli_failure_returns_compilation_evidence(
     assert payload["data"]["manifest"].endswith("compilation.json")
 
 
+def test_cli_applies_central_publication_config(
+    source: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = source.parent / "pyproject.toml"
+    config.write_text(
+        '[tool.wood_reports.publication]\nbrand_identity = "example"\n'
+        'brand_revision = "2.0.0"\nwordmark = "Internal Brand"\n'
+        '[tool.wood_reports.publication.branding]\ncorner = "bottom-left"\n'
+    )
+    monkeypatch.setattr("wood_reports.cli._compiler", lambda _config: MemoryCompiler())
+    output = source.parent / "preview"
+    assert (
+        main(
+            [
+                "preview",
+                str(source),
+                "--output",
+                str(output),
+                "--config",
+                str(config),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["status"] == "success"
+    workspace = output / "workspace/generated"
+    manifest = json.loads((workspace / "workspace.json").read_text())
+    assert manifest["brand"]["identity"] == "example"
+    assert manifest["brand"]["revision"] == "2.0.0"
+    assert "Internal Brand" in (workspace / "components.tex").read_text()
+
+
 def test_release_requires_reproducible_epoch_before_credentials_or_output(
     source: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

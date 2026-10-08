@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import math
 import re
+import tomllib
 from dataclasses import dataclass, field, fields
 from importlib.resources import files
+from pathlib import Path
+from xml.sax.saxutils import escape
+
+from wood_reports.branding import PublicationBranding, parse_logo
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +66,40 @@ class PublicationSpacing:
 
 
 @dataclass(frozen=True, slots=True)
+class PublicationTableLayout:
+    """Shared pagination and density, independent of document profile."""
+
+    density: str = "comfortable"
+    comfortable_row_inches: float = 0.28
+    compact_row_inches: float = 0.22
+    minimum_first_rows: int = 3
+    minimum_last_rows: int = 2
+    keep_together_rows: int = 6
+
+    @property
+    def row_inches(self) -> float:
+        return (
+            self.compact_row_inches
+            if self.density == "compact"
+            else self.comfortable_row_inches
+        )
+
+    def validate(self) -> None:
+        if self.density not in {"comfortable", "compact"}:
+            raise ValueError("table_layout.density must be comfortable or compact")
+        for name in ("comfortable_row_inches", "compact_row_inches"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (float, int)):
+                raise ValueError(f"table_layout.{name} must be numeric")
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(f"table_layout.{name} must be finite and positive")
+        for name in ("minimum_first_rows", "minimum_last_rows", "keep_together_rows"):
+            value = getattr(self, name)
+            if type(value) is not int or not 1 <= value <= 20:
+                raise ValueError(f"table_layout.{name} must be an integer from 1 to 20")
+
+
+@dataclass(frozen=True, slots=True)
 class PrimitiveStyle:
     """A semantic style without renderer-specific hints."""
 
@@ -74,7 +113,7 @@ class PublicationTheme:
     """Immutable, consumer-facing design contract. Overrides need a new revision."""
 
     identity: str = "wood-analytics"
-    revision: str = "1.0.0"
+    revision: str = "1.1.0"
     brand_revision: str = "1.0.0"
     wordmark: str = "Wood Analytics"
     colors: PublicationColors = field(default_factory=PublicationColors)
@@ -82,32 +121,101 @@ class PublicationTheme:
     geometry: PublicationGeometry = field(default_factory=PublicationGeometry)
     spacing: PublicationSpacing = field(default_factory=PublicationSpacing)
     page_numbers: bool = True
+    branding: PublicationBranding = field(default_factory=PublicationBranding)
+    brand_identity: str = "wood-analytics"
+    table_layout: PublicationTableLayout = field(default_factory=PublicationTableLayout)
+
+    @classmethod
+    def from_pyproject(cls, path: Path) -> PublicationTheme:
+        """Read the supported publication table from one explicitly selected file."""
+        with path.open("rb") as source:
+            config = tomllib.load(source)
+        try:
+            options = dict(
+                config.get("tool", {}).get("wood_reports", {}).get("publication", {})
+            )
+            groups = {
+                "colors": PublicationColors,
+                "typography": PublicationTypography,
+                "geometry": PublicationGeometry,
+                "spacing": PublicationSpacing,
+                "table_layout": PublicationTableLayout,
+            }
+            for name, factory in groups.items():
+                if name in options:
+                    options[name] = factory(**options[name])
+            if "branding" in options:
+                branding = dict(options["branding"])
+                if "svg_path" in branding:
+                    if "logo_svg" in branding:
+                        raise ValueError("configure svg_path or logo_svg, never both")
+                    asset = path.parent / branding.pop("svg_path")
+                    branding["logo_svg"] = PublicationBranding.from_svg(asset).logo_svg
+                options["branding"] = PublicationBranding(**branding)
+            theme = cls(**options)
+            theme.validate()
+            return theme
+        except (AttributeError, TypeError, ValueError) as error:
+            raise ValueError(f"tool.wood_reports.publication: {error}") from error
 
     @property
     def wordmark_svg(self) -> str:
-        """Bundled vector wordmark; native renderers use editable text equivalents."""
-        return files("wood_reports").joinpath("assets/wordmark.svg").read_text()
+        """The centrally configured, portable vector brand asset."""
+        if self.branding.logo_svg is not None:
+            return self.branding.logo_svg
+        return (
+            files("wood_reports")
+            .joinpath("assets/wordmark.svg")
+            .read_text()
+            .replace("Wood Analytics", escape(self.wordmark, {'"': "&quot;"}))
+            .replace("#002F6C", self.colors.primary)
+        )
 
-    def validate(self) -> None:
-        for name in ("identity", "revision", "brand_revision", "wordmark"):
-            if not getattr(self, name).strip():
+    def validate(self) -> None:  # noqa: PLR0912
+        for name in (
+            "identity",
+            "revision",
+            "brand_identity",
+            "brand_revision",
+            "wordmark",
+        ):
+            if (
+                not isinstance(getattr(self, name), str)
+                or not getattr(self, name).strip()
+            ):
                 raise ValueError(f"theme.{name} must not be blank")
+        if not isinstance(self.page_numbers, bool):
+            raise ValueError("theme.page_numbers must be a boolean")
         for token in fields(self.colors):
             if not re.fullmatch(r"#[0-9A-Fa-f]{6}", getattr(self.colors, token.name)):
                 raise ValueError(f"theme.colors.{token.name} must be a hex color")
         for group in (self.geometry, self.spacing):
             for token in fields(group):
                 value = getattr(group, token.name)
-                if not math.isfinite(value) or value <= 0:
+                if (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(value)
+                    or value <= 0
+                ):
                     raise ValueError(f"theme.{token.name} must be finite and positive")
         for token in fields(self.typography):
             value = getattr(self.typography, token.name)
             if isinstance(value, str):
                 if not value.strip():
                     raise ValueError(f"theme.typography.{token.name} must not be blank")
-            elif value <= 0:
+            elif (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(value)
+                or value <= 0
+            ):
                 raise ValueError(f"theme.typography.{token.name} must be positive")
         geometry = self.geometry
+        self.table_layout.validate()
+        self.branding.validate(geometry.page_width, geometry.page_height)
+        self.branding.validate(geometry.slide_width, geometry.slide_height)
+        parse_logo(self.wordmark_svg)
         if (
             geometry.slide_margin * 2 >= geometry.slide_width
             or geometry.content_top + geometry.content_height >= geometry.slide_height

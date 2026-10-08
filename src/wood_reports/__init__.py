@@ -9,6 +9,7 @@ from wood_reports.api import (
     ReportGenerationResult,
     TargetStatus,
 )
+from wood_reports.branding import PublicationBranding
 from wood_reports.clsi import CLSICompiler
 from wood_reports.compilation import (
     CLSIConfig,
@@ -76,6 +77,7 @@ from wood_reports.theme import (
     PublicationColors,
     PublicationGeometry,
     PublicationSpacing,
+    PublicationTableLayout,
     PublicationTheme,
     PublicationTypography,
 )
@@ -116,10 +118,12 @@ __all__ = [
     "ProfileSection",
     "ProfileValidationError",
     "PublicationAPI",
+    "PublicationBranding",
     "PublicationColors",
     "PublicationGeometry",
     "PublicationSpacing",
     "PublicationTable",
+    "PublicationTableLayout",
     "PublicationTheme",
     "PublicationTypography",
     "ReleasePublisher",

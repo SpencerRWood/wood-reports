@@ -15,6 +15,7 @@ from wood_reports.pdf_validation import PDFValidationError
 from wood_reports.profiles import get_profile, list_profiles
 from wood_reports.publication import PublicationAPI
 from wood_reports.sources import GoogleDriveReader
+from wood_reports.theme import PublicationTheme
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -145,7 +146,12 @@ def main(argv: list[str] | None = None) -> int:
     }
     code = 0
     try:
-        payload["data"] = _execute(args, PublicationAPI())
+        api = (
+            PublicationAPI(theme=PublicationTheme.from_pyproject(args.config))
+            if args.command in {"preview", "build"}
+            else PublicationAPI()
+        )
+        payload["data"] = _execute(args, api)
     except CompilationError as error:
         payload.update(status="failed", error=str(error), data=asdict(error.result))
         code = 1

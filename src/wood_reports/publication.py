@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from wood_reports.compilation import (
@@ -17,6 +17,7 @@ from wood_reports.model import Report
 from wood_reports.profiles import scaffold_markdown
 from wood_reports.release import ReleasePublisher, ReleaseResult
 from wood_reports.sources import DriveReader, compile_drive_report, read_drive_markdown
+from wood_reports.theme import WOOD_ANALYTICS_THEME, PublicationTheme
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +32,10 @@ class PublicationAPI:
     Preview PDFs are review artifacts. A successful preview never constitutes
     release validation or permission to deliver an artifact to a client.
     """
+
+    def __init__(self, *, theme: PublicationTheme = WOOD_ANALYTICS_THEME) -> None:
+        theme.validate()
+        self.theme = theme
 
     def create(  # noqa: PLR0913
         self,
@@ -74,10 +79,12 @@ class PublicationAPI:
         if reader is not None:
             if artifact_root is None:
                 raise ValueError("Drive validation requires artifact_root")
-            return compile_drive_report(source, reader, artifact_root=artifact_root)
-        return MarkdownReportCompiler().compile_file(
-            Path(source), artifact_root=artifact_root
-        )
+            report = compile_drive_report(source, reader, artifact_root=artifact_root)
+        else:
+            report = MarkdownReportCompiler().compile_file(
+                Path(source), artifact_root=artifact_root
+            )
+        return replace(report, theme=self.theme)
 
     def preview(  # noqa: PLR0913
         self,

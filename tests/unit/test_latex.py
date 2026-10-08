@@ -171,6 +171,23 @@ def test_longtable_width_hint_fails_explicitly(tmp_path: Path) -> None:
         LatexRenderer().render(report, tmp_path / "report.tex", artifact_root=tmp_path)
 
 
+def test_width_hint_preserves_existing_table_rendering(tmp_path: Path) -> None:
+    table = PublicationTable(
+        (TableColumn("month", "Month"),),
+        tuple((f"Month {index}",) for index in range(8)),
+        renderer_hints={"latex.width": "wide"},
+    )
+    report = Report(ReportMetadata("Report"), (Section("Results", (table,)),))
+    text = (
+        LatexRenderer()
+        .render(report, tmp_path / "report.tex", artifact_root=tmp_path)
+        .read_text()
+    )
+    assert r"\begin{table}[htbp]" in text
+    assert r"\begin{longtable}" not in text
+    assert all(f"Month {index}" in text for index in range(8))
+
+
 def test_finding_figure_keeps_semantic_chrome_and_local_asset(tmp_path: Path) -> None:
     chart = tmp_path / "chart.png"
     chart.write_bytes(b"x")
