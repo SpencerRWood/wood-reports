@@ -70,3 +70,7 @@ manifests record the theme and brand revisions.
 
 See [portable LaTeX workspaces](docs/latex-workspaces.md) for deterministic source
 publication, LuaLaTeX build metadata, cross-references, and human extensions.
+
+See [CLSI compilation](docs/clsi-compilation.md) for the production compiler API,
+authenticated complete-workspace submission, bounded execution, retained diagnostics,
+and repository-owned live verification.

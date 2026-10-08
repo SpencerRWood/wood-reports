@@ -50,6 +50,20 @@ packages = ["src/wood_reports"]
 project_id = 4
 initiative_id = 426
 
+[tool.wood_reports.clsi]
+url = "https://clsi.woodhost.cloud"
+timeout_seconds = 120
+
+[tool.wood.verify]
+version = 1
+retry_safe = true
+
+[[tool.wood.verify.checks]]
+name = "clsi-compilation"
+argv = ["uv", "run", "pytest", "tests/integration/test_clsi_live.py", "--run-clsi", "-q"]
+required = true
+timeout_seconds = 60
+
 [tool.pytest.ini_options]
 addopts = [
   "--strict-config",
