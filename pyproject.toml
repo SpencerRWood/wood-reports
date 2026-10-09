@@ -181,3 +181,8 @@ upload_to_vcs_release = true
 
 [tool.uv.sources]
 wood-charts = { git = "https://github.com/SpencerRWood/wood-charts.git", tag = "v0.3.0" }
+
+[tool.wood.architecture]
+domain = "reporting"
+capability = "document-rendering"
+kind = "library"
