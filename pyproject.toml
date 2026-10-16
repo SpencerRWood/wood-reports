@@ -1,188 +1,136 @@
-[build-system]
-requires = ["hatchling>=1.27"]
-build-backend = "hatchling.build"
+["build-system"]
+"requires" = ["hatchling>=1.27"]
+"build-backend" = "hatchling.build"
 
-[project]
-name = "wood-reports"
-version = "0.21.0"
-description = "Reusable publication layer for PowerPoint and LaTeX analytical reports."
-readme = "README.md"
-requires-python = ">=3.14"
-authors = [
-  { name = "Spencer Wood" },
-]
-classifiers = [
-  "Development Status :: 3 - Alpha",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.14",
-  "Typing :: Typed",
-]
-dependencies = [
-  "jinja2>=3.1",
-  "markdown-it-py>=4.0,<5",
-  "pypdf>=6,<7",
-  "pyyaml>=6.0",
-  "svg.path>=7,<8",
-]
+["project"]
+"name" = "wood-reports"
+"version" = "0.21.0"
+"description" = "Reusable publication layer for PowerPoint and LaTeX analytical reports."
+"readme" = "README.md"
+"requires-python" = ">=3.14"
+"authors" = [{ "name" = "Spencer Wood" }]
+"classifiers" = ["Development Status :: 3 - Alpha", "Intended Audience :: Developers", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.14", "Typing :: Typed"]
+"dependencies" = ["jinja2>=3.1", "markdown-it-py>=4.0,<5", "pypdf>=6,<7", "pyyaml>=6.0", "svg.path>=7,<8"]
 
-[project.scripts]
-wood-report = "wood_reports.cli:main"
+["project"."scripts"]
+"wood-report" = "wood_reports.cli:main"
 
-[project.optional-dependencies]
-powerpoint = ["python-pptx>=1.0"]
+["project"."optional-dependencies"]
+"powerpoint" = ["python-pptx>=1.0"]
 
-[dependency-groups]
-dev = [
-  "coverage[toml]",
-  "ipykernel>=7.3.0",
-  "mypy",
-  "pre-commit",
-  "pymupdf>=1.26,<2",
-  "pytest",
-  "pytest-cov",
-  "python-pptx>=1.0",
-  "python-semantic-release",
-  "ruff",
-  "types-pyyaml",
-  "wood-charts",
-]
+["dependency-groups"]
+"dev" = ["coverage[toml]", "ipykernel>=7.3.0", "mypy", "pre-commit", "pymupdf>=1.26,<2", "pytest", "pytest-cov", "python-pptx>=1.0", "python-semantic-release", "ruff", "types-pyyaml", "wood-charts"]
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/wood_reports"]
+["tool"]
 
-[tool.wood.openproject]
-project_id = 4
-initiative_id = 426
+["tool"."hatch"]
 
-[tool.wood_reports.clsi]
-url = "https://clsi.woodhost.cloud"
-timeout_seconds = 120
+["tool"."hatch"."build"]
 
-[tool.wood.verify]
-version = 1
-retry_safe = true
+["tool"."hatch"."build"."targets"]
 
-[[tool.wood.verify.checks]]
-name = "clsi-compilation"
-argv = ["uv", "run", "pytest", "tests/integration/test_clsi_live.py", "--run-clsi", "-q", "-k", "not internal_corpus"]
-required = true
-timeout_seconds = 60
+["tool"."hatch"."build"."targets"."wheel"]
+"packages" = ["src/wood_reports"]
 
-[[tool.wood.verify.checks]]
-name = "internal-corpus-publication"
-argv = ["uv", "run", "pytest", "tests/integration/test_clsi_live.py", "--run-clsi", "-q", "-k", "internal_corpus"]
-required = true
-timeout_seconds = 60
+["tool"."wood"]
 
-[[tool.wood.verify.checks]]
-name = "architecture-biber-publication"
-argv = ["uv", "run", "pytest", "tests/integration/test_architecture_live.py", "--run-clsi", "-q"]
-required = true
-timeout_seconds = 60
+["tool"."wood"."openproject"]
+"project_id" = 4
+"initiative_id" = 426
 
-[tool.pytest.ini_options]
-addopts = [
-  "--strict-config",
-  "--strict-markers",
-]
-testpaths = ["tests"]
+["tool"."wood"."verify"]
+"version" = 1
+"retry_safe" = true
+"checks" = [{ "name" = "clsi-compilation", "argv" = ["uv", "run", "pytest", "tests/integration/test_clsi_live.py", "--run-clsi", "-q", "-k", "not internal_corpus"], "required" = true, "timeout_seconds" = 60 }, { "name" = "internal-corpus-publication", "argv" = ["uv", "run", "pytest", "tests/integration/test_clsi_live.py", "--run-clsi", "-q", "-k", "internal_corpus"], "required" = true, "timeout_seconds" = 60 }, { "name" = "architecture-biber-publication", "argv" = ["uv", "run", "pytest", "tests/integration/test_architecture_live.py", "--run-clsi", "-q"], "required" = true, "timeout_seconds" = 60 }]
 
-[tool.coverage.run]
-branch = true
-source = ["wood_reports"]
+["tool"."wood"."architecture"]
+"domain" = "reporting"
+"capability" = "document-rendering"
+"kind" = "library"
 
-[tool.coverage.report]
-fail_under = 90
-show_missing = true
-skip_covered = true
+["tool"."wood"."branching"]
+"strategy" = "integration"
+"release_id" = 21
+"integration_branch" = "development"
+"scope_reference" = "https://projects.woodhost.cloud/work_packages/558 activity 1481; canonical fleet migration authorized 2026-10-15; protected-main merges remain separately approved."
 
-[tool.ruff]
-line-length = 88
-src = ["src", "tests"]
-extend-exclude = [".workflow-contract"]
+["tool"."wood_reports"]
 
-[tool.ruff.lint]
-select = [
-  "A",
-  "ARG",
-  "B",
-  "C4",
-  "DTZ",
-  "E",
-  "ERA",
-  "F",
-  "I",
-  "N",
-  "PL",
-  "PT",
-  "PTH",
-  "RET",
-  "RUF",
-  "S",
-  "SIM",
-  "T20",
-  "UP",
-  "W",
-]
-ignore = [
-  "PLR2004",
-]
+["tool"."wood_reports"."clsi"]
+"url" = "https://clsi.woodhost.cloud"
+"timeout_seconds" = 120
 
-[tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = [
-  "S101",
-]
+["tool"."pytest"]
 
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-line-ending = "auto"
+["tool"."pytest"."ini_options"]
+"addopts" = ["--strict-config", "--strict-markers"]
+"testpaths" = ["tests"]
 
-[tool.mypy]
-python_version = "3.14"
-strict = true
-warn_unused_configs = true
-mypy_path = "src"
-files = ["src", "tests"]
+["tool"."coverage"]
 
-[tool.semantic_release]
-commit_parser = "conventional"
-commit_message = "chore(release): {version}\n\nAutomatically generated by python-semantic-release"
-allow_zero_version = true
-major_on_zero = false
-tag_format = "v{version}"
-version_toml = ["pyproject.toml:project.version"]
+["tool"."coverage"."run"]
+"branch" = true
+"source" = ["wood_reports"]
 
-[tool.semantic_release.commit_parser_options]
-minor_tags = ["feat"]
-patch_tags = ["fix", "perf"]
-parse_squash_commits = true
-ignore_merge_commits = true
+["tool"."coverage"."report"]
+"fail_under" = 90
+"show_missing" = true
+"skip_covered" = true
 
-[tool.semantic_release.changelog]
-exclude_commit_patterns = [
-  '''chore(?:\([^)]*?\))?: .+''',
-  '''ci(?:\([^)]*?\))?: .+''',
-  '''docs(?:\([^)]*?\))?: .+''',
-  '''refactor(?:\([^)]*?\))?: .+''',
-  '''style(?:\([^)]*?\))?: .+''',
-  '''test(?:\([^)]*?\))?: .+''',
-  '''chore\(release\): .+''',
-]
+["tool"."ruff"]
+"line-length" = 88
+"src" = ["src", "tests"]
+"extend-exclude" = [".workflow-contract"]
 
-[tool.semantic_release.remote]
-type = "github"
-token = { env = "GITHUB_TOKEN" }
+["tool"."ruff"."lint"]
+"select" = ["A", "ARG", "B", "C4", "DTZ", "E", "ERA", "F", "I", "N", "PL", "PT", "PTH", "RET", "RUF", "S", "SIM", "T20", "UP", "W"]
+"ignore" = ["PLR2004"]
 
-[tool.semantic_release.publish]
-upload_to_vcs_release = true
+["tool"."ruff"."lint"."per-file-ignores"]
+"tests/**/*.py" = ["S101"]
 
-[tool.uv.sources]
-wood-charts = { git = "https://github.com/SpencerRWood/wood-charts.git", tag = "v0.3.0" }
+["tool"."ruff"."format"]
+"quote-style" = "double"
+"indent-style" = "space"
+"line-ending" = "auto"
 
-[tool.wood.architecture]
-domain = "reporting"
-capability = "document-rendering"
-kind = "library"
+["tool"."mypy"]
+"python_version" = "3.14"
+"strict" = true
+"warn_unused_configs" = true
+"mypy_path" = "src"
+"files" = ["src", "tests"]
+
+["tool"."semantic_release"]
+"commit_parser" = "conventional"
+"commit_message" = "chore(release): {version}\n\nAutomatically generated by python-semantic-release"
+"allow_zero_version" = true
+"major_on_zero" = false
+"tag_format" = "v{version}"
+"version_toml" = ["pyproject.toml:project.version"]
+
+["tool"."semantic_release"."commit_parser_options"]
+"minor_tags" = ["feat"]
+"patch_tags" = ["fix", "perf"]
+"parse_squash_commits" = true
+"ignore_merge_commits" = true
+
+["tool"."semantic_release"."changelog"]
+"exclude_commit_patterns" = ["chore(?:\\([^)]*?\\))?: .+", "ci(?:\\([^)]*?\\))?: .+", "docs(?:\\([^)]*?\\))?: .+", "refactor(?:\\([^)]*?\\))?: .+", "style(?:\\([^)]*?\\))?: .+", "test(?:\\([^)]*?\\))?: .+", "chore\\(release\\): .+"]
+
+["tool"."semantic_release"."remote"]
+"type" = "github"
+
+["tool"."semantic_release"."remote"."token"]
+"env" = "GITHUB_TOKEN"
+
+["tool"."semantic_release"."publish"]
+"upload_to_vcs_release" = true
+
+["tool"."uv"]
+
+["tool"."uv"."sources"]
+
+["tool"."uv"."sources"."wood-charts"]
+"git" = "https://github.com/SpencerRWood/wood-charts.git"
+"tag" = "v0.3.0"
